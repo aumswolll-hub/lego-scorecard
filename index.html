@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LEGO METHOD™ — Product Scorecard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700;9..144,900&family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --cream: #F5EFE6; --cream-soft: #FAF6EE;
+  --ink: #0F0F0F; --ink-mute: #6B6B6B;
+  --red: #C8312B; --gold: #C49A4A;
+  --green: #2E7D32; --yellow: #C68B0B;
+  --grey-line: #D9D2C5;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body { font-family: 'IBM Plex Sans Thai', sans-serif; background: var(--cream); color: var(--ink); font-size: 15px; line-height: 1.55; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+.serif { font-family: 'Fraunces', serif; }
+#loginScreen, #verifyScreen { min-height: 100vh; display: grid; place-items: center; padding: 40px 20px; background: radial-gradient(ellipse 800px 600px at 20% 20%, rgba(200,49,43,0.06), transparent 60%), radial-gradient(ellipse 600px 400px at 80% 80%, rgba(196,154,74,0.05), transparent 60%), var(--cream); }
+.login-card { width: 100%; max-width: 480px; background: var(--cream-soft); border: 1.5px solid var(--ink); padding: 56px 44px 48px; position: relative; box-shadow: 8px 8px 0 var(--ink); }
+.login-mark { position: absolute; top: -1.5px; left: -1.5px; background: var(--ink); color: var(--cream); padding: 8px 14px; font-family: 'Fraunces', serif; font-weight: 700; font-size: 12px; letter-spacing: 0.15em; text-transform: uppercase; }
+.login-card h1 { font-family: 'Fraunces', serif; font-weight: 900; font-size: clamp(36px, 5vw, 48px); line-height: 0.95; letter-spacing: -0.03em; margin-bottom: 8px; }
+.login-card h1 em { font-style: italic; font-weight: 500; color: var(--red); }
+.login-card .sub { font-size: 13px; color: var(--ink-mute); margin-bottom: 36px; }
+.field-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.18em; font-weight: 600; margin-bottom: 10px; display: block; }
+#emailInput { width: 100%; background: transparent; border: none; border-bottom: 1.5px solid var(--ink); padding: 12px 0; font-family: 'Fraunces', serif; font-weight: 500; font-size: 20px; color: var(--ink); outline: none; }
+#emailInput::placeholder { color: var(--ink-mute); opacity: 0.5; font-weight: 400; }
+#emailInput:focus { border-bottom-color: var(--red); }
+.login-error { font-size: 12px; color: var(--red); margin-top: 12px; min-height: 18px; }
+.login-success { font-size: 13px; color: var(--green); margin-top: 12px; min-height: 18px; font-weight: 500; }
+.login-btn { width: 100%; margin-top: 28px; background: var(--ink); color: var(--cream); border: none; padding: 16px; font-family: 'IBM Plex Sans Thai', sans-serif; font-weight: 600; font-size: 13px; letter-spacing: 0.2em; text-transform: uppercase; cursor: pointer; transition: all 0.15s; }
+.login-btn:hover:not(:disabled) { background: var(--red); transform: translate(-2px,-2px); box-shadow: 4px 4px 0 var(--ink); }
+.login-btn:disabled { background: var(--grey-line); color: var(--ink-mute); cursor: not-allowed; }
+.login-card .hint { margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--grey-line); font-size: 11px; color: var(--ink-mute); line-height: 1.6; }
+.verify-spinner { text-align: center; padding: 20px 0; }
+.verify-spinner .dots { font-family: 'Fraunces', serif; font-weight: 900; font-size: 48px; color: var(--red); letter-spacing: 0.1em; animation: pulse 1.2s ease-in-out infinite; }
+@keyframes pulse { 0%,100%{opacity:0.3} 50%{opacity:1} }
+#app { display: none; min-height: 100vh; }
+#app.active { display: block; }
+.topbar { position: sticky; top: 0; background: var(--cream); border-bottom: 1.5px solid var(--ink); padding: 14px 28px; display: flex; align-items: center; justify-content: space-between; z-index: 100; gap: 14px; flex-wrap: wrap; }
+.brand { display: flex; align-items: baseline; gap: 12px; }
+.brand .mark { background: var(--ink); color: var(--cream); padding: 5px 9px; font-family: 'Fraunces', serif; font-weight: 700; font-size: 11px; letter-spacing: 0.2em; }
+.brand .name { font-family: 'Fraunces', serif; font-weight: 600; font-size: 18px; }
+.brand .name em { font-style: italic; color: var(--red); font-weight: 500; }
+.user-info { font-size: 11px; color: var(--ink-mute); }
+.nav-tabs { display: flex; }
+.nav-tab { background: transparent; border: none; padding: 10px 18px; font-family: 'IBM Plex Sans Thai', sans-serif; font-weight: 500; font-size: 13px; color: var(--ink-mute); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; }
+.nav-tab:hover { color: var(--ink); }
+.nav-tab.active { color: var(--ink); border-bottom-color: var(--red); font-weight: 600; }
+.nav-tab .count { margin-left: 6px; background: var(--ink); color: var(--cream); font-size: 10px; padding: 2px 7px; border-radius: 9px; font-weight: 600; }
+.logout-btn { background: transparent; border: 1px solid var(--ink); padding: 7px 14px; font-family: 'IBM Plex Sans Thai', sans-serif; font-size: 11px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; transition: all 0.15s; }
+.logout-btn:hover { background: var(--ink); color: var(--cream); }
+.view { display: none; padding: 32px 28px 80px; max-width: 980px; margin: 0 auto; }
+.view.active { display: block; }
+.page-header { margin-bottom: 32px; display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; flex-wrap: wrap; padding-bottom: 20px; border-bottom: 1.5px solid var(--ink); }
+.page-header h2 { font-family: 'Fraunces', serif; font-weight: 900; font-size: clamp(32px, 4vw, 44px); line-height: 0.95; letter-spacing: -0.025em; }
+.page-header h2 em { font-style: italic; color: var(--red); font-weight: 500; }
+.page-header .sub { font-size: 12px; color: var(--ink-mute); }
+.filter-block { background: var(--cream-soft); border: 1.5px solid var(--ink); margin-bottom: 18px; overflow: hidden; }
+.filter-head { background: var(--ink); color: var(--cream); padding: 12px 20px; display: flex; align-items: center; gap: 14px; }
+.filter-head .num { font-family: 'Fraunces', serif; font-weight: 900; font-size: 20px; font-style: italic; color: var(--gold); }
+.filter-head .title { font-weight: 600; font-size: 14px; }
+.filter-head .meta { margin-left: auto; font-size: 11px; letter-spacing: 0.1em; color: var(--gold); text-transform: uppercase; }
+.filter-body { padding: 22px 24px; }
+.input-row { display: grid; grid-template-columns: 1fr 160px; gap: 18px; align-items: center; margin-bottom: 12px; }
+.input-row:last-child { margin-bottom: 0; }
+.input-label { font-size: 13px; font-weight: 500; }
+.input-label .opt { font-size: 10px; color: var(--ink-mute); margin-left: 6px; text-transform: uppercase; letter-spacing: 0.1em; }
+.input-wrap { position: relative; }
+.input-wrap input, .angle-input { width: 100%; background: var(--cream); border: 1.5px solid var(--ink); padding: 10px 14px; font-family: 'IBM Plex Sans Thai', sans-serif; font-size: 14px; color: var(--ink); outline: none; transition: border-color 0.15s; }
+.input-wrap input:focus, .angle-input:focus { border-color: var(--red); }
+.input-wrap.with-suffix input { padding-right: 32px; }
+.input-wrap .suffix { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-size: 13px; color: var(--ink-mute); font-weight: 600; pointer-events: none; }
+.feedback { margin-top: 16px; padding: 12px 16px; background: var(--cream); border-left: 3px solid var(--ink); font-size: 13px; min-height: 44px; display: flex; align-items: center; }
+.feedback.score-3 { border-left-color: var(--green); background: #E8F0E1; }
+.feedback.score-2 { border-left-color: var(--yellow); background: #FAF1D8; }
+.feedback.score-1 { border-left-color: var(--red); background: #F8DEDC; }
+.feedback.score-0 { border-left-color: var(--ink); background: #E5E0D2; }
+.feedback .score-badge { background: var(--ink); color: var(--cream); padding: 3px 10px; font-family: 'Fraunces', serif; font-weight: 700; font-size: 11px; margin-right: 10px; letter-spacing: 0.1em; }
+.feedback.score-3 .score-badge { background: var(--green); }
+.feedback.score-2 .score-badge { background: var(--yellow); }
+.feedback.score-1 .score-badge { background: var(--red); }
+.angles-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.angle-input { font-size: 13px; padding: 8px 12px; }
+.result-block { margin-top: 32px; background: var(--ink); color: var(--cream); padding: 36px; border: 1.5px solid var(--ink); position: relative; }
+.result-block::before { content: ''; position: absolute; top: 8px; left: 8px; right: 8px; bottom: 8px; border: 1px solid rgba(245,239,230,0.15); pointer-events: none; }
+.result-grid { display: grid; grid-template-columns: 1fr 1fr 1.5fr; gap: 28px; align-items: center; }
+.result-label { font-size: 10px; letter-spacing: 0.25em; text-transform: uppercase; color: rgba(245,239,230,0.55); margin-bottom: 6px; font-weight: 600; }
+.result-value { font-family: 'Fraunces', serif; font-weight: 900; font-size: 56px; line-height: 0.9; letter-spacing: -0.04em; }
+.result-value .max { font-size: 22px; color: rgba(245,239,230,0.4); font-weight: 400; margin-left: 4px; }
+.result-pct { color: var(--gold); font-style: italic; font-weight: 500; }
+.result-decision { text-align: right; font-family: 'Fraunces', serif; font-weight: 700; font-size: 26px; line-height: 1.1; }
+.result-decision.pick { color: #8AD17F; }
+.result-decision.wait { color: var(--gold); }
+.result-decision.drop { color: #F08A85; }
+.result-decision.empty { color: rgba(245,239,230,0.4); font-weight: 400; font-size: 16px; font-style: italic; }
+.result-decision .label { display: block; font-size: 9px; letter-spacing: 0.3em; color: rgba(245,239,230,0.5); margin-bottom: 8px; text-transform: uppercase; font-weight: 600; font-family: 'IBM Plex Sans Thai', sans-serif; }
+.result-message { margin-top: 20px; padding-top: 20px; border-top: 1px solid rgba(245,239,230,0.15); font-size: 13px; color: rgba(245,239,230,0.8); font-style: italic; }
+.actions { margin-top: 28px; display: flex; gap: 12px; flex-wrap: wrap; }
+.btn { padding: 14px 24px; font-family: 'IBM Plex Sans Thai', sans-serif; font-weight: 600; font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase; cursor: pointer; border: 1.5px solid var(--ink); transition: all 0.15s; }
+.btn-primary { background: var(--red); color: var(--cream); border-color: var(--red); }
+.btn-primary:hover:not(:disabled) { background: var(--ink); border-color: var(--ink); transform: translate(-2px,-2px); box-shadow: 4px 4px 0 var(--red); }
+.btn-primary:disabled { background: var(--grey-line); border-color: var(--grey-line); color: var(--ink-mute); cursor: not-allowed; }
+.btn-secondary { background: transparent; color: var(--ink); }
+.btn-secondary:hover { background: var(--ink); color: var(--cream); }
+.tracker-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; gap: 12px; flex-wrap: wrap; }
+.tracker-toolbar .stats { display: flex; gap: 24px; }
+.stat { font-family: 'Fraunces', serif; }
+.stat .num { font-weight: 900; font-size: 30px; line-height: 1; letter-spacing: -0.02em; }
+.stat .num.pick { color: var(--green); }
+.stat .num.wait { color: var(--yellow); }
+.stat .num.drop { color: var(--red); }
+.stat .lbl { font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-mute); margin-top: 4px; font-family: 'IBM Plex Sans Thai', sans-serif; font-weight: 600; }
+.tracker-table { background: var(--cream-soft); border: 1.5px solid var(--ink); overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+thead { background: var(--ink); color: var(--cream); }
+thead th { padding: 12px 14px; text-align: left; font-weight: 600; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; }
+thead th.center { text-align: center; }
+tbody tr { border-bottom: 1px solid var(--grey-line); transition: background 0.1s; }
+tbody tr:hover { background: var(--cream); }
+tbody tr:last-child { border-bottom: none; }
+tbody td { padding: 12px 14px; vertical-align: middle; }
+tbody td.center { text-align: center; }
+tbody td.product { font-weight: 600; font-family: 'Fraunces', serif; font-size: 15px; }
+tbody td.score { font-family: 'Fraunces', serif; font-weight: 700; font-size: 15px; }
+.badge { display: inline-block; padding: 4px 10px; font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; font-family: 'IBM Plex Sans Thai', sans-serif; }
+.badge.pick { background: #C8E8C0; color: #1B5E20; }
+.badge.wait { background: #F8E5B0; color: #6B4400; }
+.badge.drop { background: #F2C7C3; color: #7A1A14; }
+.row-del { background: transparent; border: 1px solid var(--grey-line); color: var(--ink-mute); padding: 5px 9px; cursor: pointer; font-size: 11px; transition: all 0.15s; }
+.row-del:hover { background: var(--red); color: var(--cream); border-color: var(--red); }
+.empty-state { text-align: center; padding: 64px 24px; color: var(--ink-mute); }
+.empty-state .icon { font-family: 'Fraunces', serif; font-style: italic; font-weight: 500; font-size: 56px; color: var(--grey-line); margin-bottom: 16px; line-height: 1; }
+.empty-state h3 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 22px; color: var(--ink); margin-bottom: 6px; }
+.empty-state p { font-size: 13px; }
+.toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(120%); background: var(--ink); color: var(--cream); padding: 14px 24px; font-size: 13px; font-weight: 500; border: 1.5px solid var(--ink); box-shadow: 4px 4px 0 var(--red); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 200; }
+.toast.show { transform: translateX(-50%) translateY(0); }
+.toast .check { color: var(--gold); margin-right: 8px; font-family: 'Fraunces', serif; font-weight: 700; }
+@media (max-width: 720px) {
+  .topbar { padding: 12px 16px; }
+  .nav-tabs { order: 3; width: 100%; }
+  .nav-tab { padding: 8px 12px; font-size: 12px; }
+  .user-info { display: none; }
+  .view { padding: 24px 16px 80px; }
+  .input-row { grid-template-columns: 1fr; gap: 8px; }
+  .angles-grid { grid-template-columns: 1fr; }
+  .result-block { padding: 24px; }
+  .result-grid { grid-template-columns: 1fr; gap: 20px; }
+  .result-decision { text-align: left; }
+  .result-value { font-size: 44px; }
+  .tracker-toolbar .stats { gap: 16px; }
+  .stat .num { font-size: 22px; }
+  thead th, tbody td { padding: 10px 8px; font-size: 12px; }
+}
+</style>
+</head>
+<body>
+
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-mark">LEGO METHOD™</div>
+    <h1 class="serif">Product<br><em>Scorecard</em></h1>
+    <p class="sub">ใส่ email ที่ใช้ซื้อคอร์ส — ระบบจะส่งลิงก์เข้าใช้งานไปทาง email</p>
+    <label class="field-label">Email</label>
+    <input type="email" id="emailInput" placeholder="you@example.com" autocomplete="email">
+    <div class="login-error" id="loginError"></div>
+    <div class="login-success" id="loginSuccess"></div>
+    <button class="login-btn" id="loginBtn" onclick="requestMagicLink()">ส่งลิงก์เข้าใช้งาน</button>
+    <p class="hint">ระบบจะตรวจสอบกับ Stripe ว่า email นี้ซื้อคอร์สแล้วหรือยัง<br>หากซื้อแล้ว — ลิงก์จะถูกส่งไปที่ email ภายใน 1 นาที</p>
+  </div>
+</div>
+
+<div id="verifyScreen" style="display:none">
+  <div class="login-card">
+    <div class="login-mark">VERIFYING</div>
+    <h1 class="serif">กำลัง<br><em>ตรวจสอบ</em></h1>
+    <div class="verify-spinner"><div class="dots">···</div><p style="font-size:12px;color:var(--ink-mute);margin-top:12px">รอสักครู่</p></div>
+    <div class="login-error" id="verifyError"></div>
+  </div>
+</div>
+
+<div id="app">
+  <div class="topbar">
+    <div class="brand">
+      <div class="mark">LEGO</div>
+      <div class="name serif">Product <em>Scorecard</em></div>
+    </div>
+    <div class="user-info" id="userInfo"></div>
+    <div class="nav-tabs">
+      <button class="nav-tab active" data-view="scorecard" onclick="switchView('scorecard')">Scorecard</button>
+      <button class="nav-tab" data-view="tracker" onclick="switchView('tracker')">Tracker <span class="count" id="trackerCount">0</span></button>
+    </div>
+    <button class="logout-btn" onclick="logout()">Logout</button>
+  </div>
+
+  <div class="view active" id="view-scorecard">
+    <div class="page-header"><div><h2 class="serif">ตรวจสินค้า<em> ของคุณ</em></h2><div class="sub">กรอกข้อมูล — ระบบจะตัดสินใจให้</div></div></div>
+    <div class="filter-block"><div class="filter-head"><span class="num">0</span><span class="title">Product Name</span></div><div class="filter-body"><div class="input-wrap"><input type="text" id="productName" placeholder="ชื่อสินค้า"></div></div></div>
+    <div class="filter-block"><div class="filter-head"><span class="num">1</span><span class="title">Commission Filter</span><span class="meta">Optional</span></div><div class="filter-body"><div class="input-row"><label class="input-label">ค่าคอมมิชชั่น <span class="opt">— ใส่ก็ได้</span></label><div class="input-wrap with-suffix"><input type="number" id="commission" step="0.1" placeholder="20"><span class="suffix">%</span></div></div><div class="feedback" id="fb-commission">— ข้ามข้อนี้ก็ได้</div></div></div>
+    <div class="filter-block"><div class="filter-head"><span class="num">2</span><span class="title">Demand Filter — GMV Growth</span><span class="meta">7 วัน = Leading</span></div><div class="filter-body"><div class="input-row"><label class="input-label">GMV Growth — 7 วันล่าสุด</label><div class="input-wrap with-suffix"><input type="number" id="gmv7" step="0.1" placeholder="15"><span class="suffix">%</span></div></div><div class="input-row"><label class="input-label">GMV Growth — 30 วันล่าสุด</label><div class="input-wrap with-suffix"><input type="number" id="gmv30" step="0.1" placeholder="30"><span class="suffix">%</span></div></div><div class="feedback" id="fb-demand">← กรอกทั้ง 7 และ 30 วัน</div></div></div>
+    <div class="filter-block"><div class="filter-head"><span class="num">3</span><span class="title">จำนวน Creator ในตลาด</span><span class="meta">ไม่มีคะแนน</span></div><div class="filter-body"><div class="input-row"><label class="input-label">จำนวน Creator ทั้งหมด</label><div class="input-wrap"><input type="number" id="creators" placeholder="500"></div></div><div class="feedback" id="fb-creators">ใช้คำนวณรวมกับ CR ในข้อ 5</div></div></div>
+    <div class="filter-block"><div class="filter-head"><span class="num">4</span><span class="title">Content Fit — Angles ที่พูดได้</span><span class="meta">นอกจากราคา</span></div><div class="filter-body"><div class="angles-grid"><input type="text" class="angle-input" id="angle1" placeholder="Angle 1"><input type="text" class="angle-input" id="angle2" placeholder="Angle 2"><input type="text" class="angle-input" id="angle3" placeholder="Angle 3"><input type="text" class="angle-input" id="angle4" placeholder="Angle 4"><input type="text" class="angle-input" id="angle5" placeholder="Angle 5"></div><div class="feedback" id="fb-angles">← พิมพ์ Angle ที่นึกออก</div></div></div>
+    <div class="filter-block"><div class="filter-head"><span class="num">5</span><span class="title">Creator CR + Probability</span><span class="meta">จาก Kalodata</span></div><div class="filter-body"><div class="input-row"><label class="input-label">Creator Conversion Rate</label><div class="input-wrap with-suffix"><input type="number" id="cr" step="0.1" placeholder="15"><span class="suffix">%</span></div></div><div class="feedback" id="fb-prob">— กรอก CR เพื่อคำนวณ Expected Sellers</div></div></div>
+    <div class="filter-block"><div class="filter-head"><span class="num">6</span><span class="title">Sales Concentration</span><span class="meta">Top 3 / Total</span></div><div class="filter-body"><div class="input-row"><label class="input-label">Top 3 Creator ÷ Revenue รวม</label><div class="input-wrap with-suffix"><input type="number" id="conc" step="0.1" placeholder="25"><span class="suffix">%</span></div></div><div class="feedback" id="fb-conc">← ยิ่งต่ำ ยิ่งดี</div></div></div>
+    <div class="result-block">
+      <div class="result-grid">
+        <div><div class="result-label">Total Score</div><div class="result-value" id="totalDisplay">—<span class="max" id="maxDisplay"></span></div></div>
+        <div><div class="result-label">Percentage</div><div class="result-value result-pct" id="pctDisplay">—</div></div>
+        <div class="result-decision empty" id="decisionDisplay"><span class="label">Decision</span><span id="decisionText">กรอกข้อมูลเพื่อดูผล</span></div>
+      </div>
+      <div class="result-message" id="resultMsg">≥75% = PICK · 50–74% = WAIT · &lt;50% = DROP</div>
+    </div>
+    <div class="actions">
+      <button class="btn btn-primary" id="saveBtn" onclick="saveProduct()" disabled>บันทึกไป Tracker</button>
+      <button class="btn btn-secondary" onclick="clearForm()">ล้างข้อมูล</button>
+    </div>
+  </div>
+
+  <div class="view" id="view-tracker">
+    <div class="page-header"><div><h2 class="serif">Product<em> Tracker</em></h2><div class="sub">ประวัติสินค้าที่คุณตรวจไปแล้ว</div></div></div>
+    <div class="tracker-toolbar">
+      <div class="stats">
+        <div class="stat"><div class="num pick" id="statPick">0</div><div class="lbl">Pick</div></div>
+        <div class="stat"><div class="num wait" id="statWait">0</div><div class="lbl">Wait</div></div>
+        <div class="stat"><div class="num drop" id="statDrop">0</div><div class="lbl">Drop</div></div>
+      </div>
+      <div style="display:flex; gap:10px;">
+        <button class="btn btn-secondary" onclick="exportCSV()">Export CSV</button>
+        <button class="btn btn-secondary" onclick="clearAll()" style="border-color: var(--red); color: var(--red);">ล้างทั้งหมด</button>
+      </div>
+    </div>
+    <div id="trackerContent"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><span class="check">✓</span> <span id="toastMsg">บันทึกแล้ว</span></div>
+
+<script>
+const SESSION_KEY = "lego_session";
+const TRACKER_KEY = "lego_tracker_v2";
+let currentSession = null;
+
+async function requestMagicLink() {
+  const email = document.getElementById("emailInput").value.trim().toLowerCase();
+  const err = document.getElementById("loginError");
+  const ok  = document.getElementById("loginSuccess");
+  const btn = document.getElementById("loginBtn");
+  err.textContent = ""; ok.textContent = "";
+  if (!email || !email.includes("@")) { err.textContent = "ใส่ email ที่ถูกต้อง"; return; }
+  btn.disabled = true; btn.textContent = "กำลังส่ง...";
+  try {
+    const res = await fetch("/api/auth", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({email}) });
+    const data = await res.json();
+    if (res.ok) { ok.textContent = "✓ ส่งลิงก์ไปที่ " + email + " — เช็ค inbox / spam"; document.getElementById("emailInput").value = ""; }
+    else { err.textContent = data.error || "ไม่พบ email นี้ในระบบ"; }
+  } catch (e) { err.textContent = "เกิดข้อผิดพลาด — ลองใหม่"; }
+  finally { btn.disabled = false; btn.textContent = "ส่งลิงก์เข้าใช้งาน"; }
+}
+document.getElementById("emailInput").addEventListener("keypress", e => { if (e.key === "Enter") requestMagicLink(); });
+
+async function verifyToken(token) {
+  document.getElementById("loginScreen").style.display = "none";
+  document.getElementById("verifyScreen").style.display = "grid";
+  try {
+    const res = await fetch("/api/verify?token=" + encodeURIComponent(token));
+    const data = await res.json();
+    if (res.ok && data.email) {
+      currentSession = { email: data.email, token: data.sessionToken, expiresAt: data.expiresAt };
+      localStorage.setItem(SESSION_KEY, JSON.stringify(currentSession));
+      history.replaceState({}, "", window.location.pathname);
+      showApp();
+    } else {
+      document.getElementById("verifyError").textContent = data.error || "ลิงก์หมดอายุหรือใช้แล้ว";
+      setTimeout(() => { document.getElementById("verifyScreen").style.display = "none"; document.getElementById("loginScreen").style.display = "grid"; }, 2500);
+    }
+  } catch (e) { document.getElementById("verifyError").textContent = "เกิดข้อผิดพลาด"; }
+}
+
+function checkSession() {
+  try {
+    const s = JSON.parse(localStorage.getItem(SESSION_KEY) || "null");
+    if (s && s.email && s.expiresAt && new Date(s.expiresAt) > new Date()) { currentSession = s; return true; }
+  } catch {}
+  return false;
+}
+
+function logout() {
+  if (!confirm("ออกจากระบบ? (ข้อมูล Tracker ใน browser นี้จะยังอยู่)")) return;
+  localStorage.removeItem(SESSION_KEY);
+  location.reload();
+}
+
+function showApp() {
+  document.getElementById("loginScreen").style.display = "none";
+  document.getElementById("verifyScreen").style.display = "none";
+  document.getElementById("app").classList.add("active");
+  document.getElementById("userInfo").textContent = currentSession.email;
+  renderTracker(); updateTrackerCount();
+}
+
+function trackerKey() { return TRACKER_KEY + "::" + (currentSession?.email || "anon"); }
+function getTracker() { try { return JSON.parse(localStorage.getItem(trackerKey()) || "[]"); } catch { return []; } }
+function setTracker(arr) { localStorage.setItem(trackerKey(), JSON.stringify(arr)); }
+
+function switchView(name) {
+  document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
+  document.getElementById("view-" + name).classList.add("active");
+  document.querySelectorAll(".nav-tab").forEach(t => t.classList.toggle("active", t.dataset.view === name));
+  if (name === "tracker") renderTracker();
+  window.scrollTo({top: 0, behavior: "smooth"});
+}
+
+function num(id) { const v = document.getElementById(id).value; return v === "" ? null : parseFloat(v); }
+function scoreCommission(c) { if (c === null || isNaN(c)) return null; if (c >= 20) return 3; if (c >= 15) return 2; if (c >= 10) return 1; return 0; }
+function scoreDemand(d7, d30) { if (d7 === null || d30 === null) return null; if (d7 > 0) return 3; if (d7 <= 0 && d30 > 0 && Math.abs(d7)/d30 < 0.2) return 2; return 1; }
+function scoreAngles() { let n = 0; for (let i = 1; i <= 5; i++) if (document.getElementById("angle"+i).value.trim()) n++; if (n === 0) return null; if (n >= 3) return 3; if (n === 2) return 2; return 1; }
+function scoreProbability(cr) { if (cr === null) return null; if (cr >= 20) return 3; if (cr >= 10) return 2; return 1; }
+function scoreConcentration(c) { if (c === null) return null; if (c < 30) return 3; if (c <= 60) return 2; return 1; }
+function setFeedback(id, score, msg) { const el = document.getElementById(id); el.className = "feedback"; if (score !== null) el.classList.add("score-" + score); el.innerHTML = msg; }
+
+function updateAll() {
+  const comm = num("commission");
+  const sComm = scoreCommission(comm);
+  if (comm === null) setFeedback("fb-commission", null, "— ข้ามข้อนี้ก็ได้");
+  else if (sComm === 3) setFeedback("fb-commission", 3, `<span class="score-badge">3</span> ≥20% — Strong margin`);
+  else if (sComm === 2) setFeedback("fb-commission", 2, `<span class="score-badge">2</span> 15–19% — Acceptable`);
+  else if (sComm === 1) setFeedback("fb-commission", 1, `<span class="score-badge">1</span> 10–14% — ต่ำ`);
+  else setFeedback("fb-commission", 0, `<span class="score-badge">0</span> &lt;10% — ไม่แนะนำ`);
+
+  const d7 = num("gmv7"), d30 = num("gmv30");
+  const sDemand = scoreDemand(d7, d30);
+  if (sDemand === null) setFeedback("fb-demand", null, "← กรอกทั้ง 7 และ 30 วัน");
+  else if (d7 > 0 && d30 > 0) setFeedback("fb-demand", 3, `<span class="score-badge">3</span> 7d↑ 30d↑ — เทรนด์แข็งแกร่ง`);
+  else if (d7 > 0 && d30 <= 0) setFeedback("fb-demand", 3, `<span class="score-badge">3</span> 7d↑ 30d↓ — เทรนด์กำลังมา`);
+  else if (sDemand === 2) { const r = Math.round((Math.abs(d7)/d30)*100); setFeedback("fb-demand", 2, `<span class="score-badge">2</span> 7d↓ ${r}% ของ growth — Pause นิดเดียว`); }
+  else if (d7 <= 0 && d30 > 0) { const r = Math.round((Math.abs(d7)/d30)*100); setFeedback("fb-demand", 1, `<span class="score-badge">1</span> 7d↓ ${r}% ของ growth — Creator ย้ายออก`); }
+  else setFeedback("fb-demand", 1, `<span class="score-badge">1</span> 7d↓ 30d↓ — ตลาดตาย`);
+
+  const creators = num("creators");
+  if (creators === null) setFeedback("fb-creators", null, "ใช้คำนวณรวมกับ CR ในข้อ 5");
+  else setFeedback("fb-creators", null, `<span class="score-badge">i</span> ${creators.toLocaleString()} คน — ใช้คำนวณ Expected Sellers`);
+
+  let nAng = 0;
+  for (let i = 1; i <= 5; i++) if (document.getElementById("angle"+i).value.trim()) nAng++;
+  const sAng = scoreAngles();
+  if (sAng === null) setFeedback("fb-angles", null, "← พิมพ์ Angle ที่นึกออก");
+  else if (sAng === 3) setFeedback("fb-angles", 3, `<span class="score-badge">3</span> ${nAng} angles — ผ่าน`);
+  else if (sAng === 2) setFeedback("fb-angles", 2, `<span class="score-badge">2</span> ${nAng} angles — พอได้`);
+  else setFeedback("fb-angles", 1, `<span class="score-badge">1</span> ${nAng} angle — ไม่พอ`);
+
+  const cr = num("cr");
+  const sProb = scoreProbability(cr);
+  if (sProb === null) setFeedback("fb-prob", null, "— กรอก CR เพื่อคำนวณ Expected Sellers");
+  else {
+    const exp = creators !== null ? Math.round(creators * cr / 100) : null;
+    const expStr = exp !== null ? ` (${exp.toLocaleString()} คนขายได้)` : '';
+    if (sProb === 3) setFeedback("fb-prob", 3, `<span class="score-badge">3</span> CR ${cr}% — ≥20% ratio${expStr}`);
+    else if (sProb === 2) setFeedback("fb-prob", 2, `<span class="score-badge">2</span> CR ${cr}% — 10–19% ratio${expStr}`);
+    else setFeedback("fb-prob", 1, `<span class="score-badge">1</span> CR ${cr}% — &lt;10% ratio${expStr}`);
+  }
+
+  const conc = num("conc");
+  const sConc = scoreConcentration(conc);
+  if (sConc === null) setFeedback("fb-conc", null, "← ยิ่งต่ำ ยิ่งดี (ยอดขายกระจาย)");
+  else if (sConc === 3) setFeedback("fb-conc", 3, `<span class="score-badge">3</span> &lt;30% — กระจายดี`);
+  else if (sConc === 2) setFeedback("fb-conc", 2, `<span class="score-badge">2</span> 30–60% — พอรับได้`);
+  else setFeedback("fb-conc", 1, `<span class="score-badge">1</span> ≥60% — กระจุก`);
+
+  const hasComm = comm !== null;
+  const fields = [sDemand, sAng, sProb, sConc];
+  if (hasComm) fields.push(sComm);
+  const filled = fields.filter(s => s !== null).length;
+  const total = fields.reduce((sum, s) => sum + (s ?? 0), 0);
+  const max = hasComm ? 15 : 12;
+
+  const totalEl = document.getElementById("totalDisplay");
+  const pctEl = document.getElementById("pctDisplay");
+  const decEl = document.getElementById("decisionDisplay");
+  const decTxt = document.getElementById("decisionText");
+  const msg = document.getElementById("resultMsg");
+  const saveBtn = document.getElementById("saveBtn");
+  const allFilled = (sDemand !== null && sAng !== null && sProb !== null && sConc !== null);
+
+  if (!allFilled) {
+    totalEl.innerHTML = "—" + (hasComm ? '<span class="max">/15</span>' : '<span class="max">/12</span>');
+    pctEl.textContent = "—";
+    decEl.className = "result-decision empty";
+    decTxt.textContent = "กรอกข้อมูลให้ครบเพื่อดูผล";
+    msg.textContent = `กรอกแล้ว ${filled}/${hasComm ? 5 : 4} ข้อ`;
+    saveBtn.disabled = true;
+  } else {
+    const pct = total / max;
+    totalEl.innerHTML = total + '<span class="max">/' + max + '</span>';
+    pctEl.textContent = Math.round(pct * 100) + "%";
+    decEl.className = "result-decision";
+    if (pct >= 0.74) { decEl.classList.add("pick"); decTxt.textContent = "✓ PICK IT"; msg.textContent = "เริ่ม Speed-to-Post ได้เลย — สินค้าตัวนี้ผ่านทุกฟิลเตอร์สำคัญ"; }
+    else if (pct >= 0.5) { decEl.classList.add("wait"); decTxt.textContent = "⏳ WAIT"; msg.textContent = "เก็บไว้ตรวจอีก 7 วัน — ปรับ angle หรือรอตลาดเปลี่ยน"; }
+    else { decEl.classList.add("drop"); decTxt.textContent = "✗ DROP IT"; msg.textContent = "เลือกสินค้าตัวใหม่ — คะแนนต่ำเกินไป"; }
+    saveBtn.disabled = !document.getElementById("productName").value.trim();
+  }
+}
+
+function saveProduct() {
+  const name = document.getElementById("productName").value.trim();
+  if (!name) { showToast("ใส่ชื่อสินค้าก่อน"); return; }
+  const comm = num("commission"), d7 = num("gmv7"), d30 = num("gmv30");
+  const cr = num("cr"), conc = num("conc"), creators = num("creators");
+  const sComm = scoreCommission(comm), sDemand = scoreDemand(d7, d30);
+  const sAng = scoreAngles(), sProb = scoreProbability(cr), sConc = scoreConcentration(conc);
+  const hasComm = comm !== null;
+  let total = (sDemand ?? 0) + (sAng ?? 0) + (sProb ?? 0) + (sConc ?? 0);
+  if (hasComm) total += (sComm ?? 0);
+  const max = hasComm ? 15 : 12;
+  const pct = total / max;
+  const decision = pct >= 0.74 ? "PICK" : pct >= 0.5 ? "WAIT" : "DROP";
+  const angles = [];
+  for (let i = 1; i <= 5; i++) { const v = document.getElementById("angle"+i).value.trim(); if (v) angles.push(v); }
+  const record = { id: Date.now(), timestamp: new Date().toISOString(), product: name, commission: comm, sComm, gmv7: d7, gmv30: d30, sDemand, creators, angles, sAngles: sAng, cr, sProb, conc, sConc, total, max, pct, decision };
+  const tracker = getTracker(); tracker.unshift(record); setTracker(tracker);
+  updateTrackerCount();
+  showToast(`บันทึก "${name}" แล้ว — ${decision}`);
+  if (confirm(`บันทึก "${name}" แล้ว ✓\n\nผลลัพธ์: ${decision} (${total}/${max} = ${Math.round(pct*100)}%)\n\nต้องการล้างข้อมูลเพื่อตรวจสินค้าตัวต่อไปมั้ย?`)) clearForm();
+}
+
+function clearForm() {
+  ["productName","commission","gmv7","gmv30","creators","cr","conc"].forEach(id => { document.getElementById(id).value = ""; });
+  for (let i = 1; i <= 5; i++) document.getElementById("angle"+i).value = "";
+  updateAll();
+  document.getElementById("productName").focus();
+  window.scrollTo({top: 0, behavior: "smooth"});
+}
+
+function renderTracker() {
+  const data = getTracker();
+  const container = document.getElementById("trackerContent");
+  document.getElementById("statPick").textContent = data.filter(r => r.decision === "PICK").length;
+  document.getElementById("statWait").textContent = data.filter(r => r.decision === "WAIT").length;
+  document.getElementById("statDrop").textContent = data.filter(r => r.decision === "DROP").length;
+  if (data.length === 0) {
+    container.innerHTML = `<div class="empty-state"><div class="icon">∅</div><h3>ยังไม่มีสินค้าใน Tracker</h3><p>กลับไปที่ Scorecard เพื่อเริ่มตรวจสินค้าตัวแรก</p></div>`;
+    return;
+  }
+  let html = `<div class="tracker-table"><table><thead><tr><th>Product</th><th class="center">Comm</th><th class="center">Dem</th><th class="center">Ang</th><th class="center">Prob</th><th class="center">Conc</th><th class="center">Score</th><th class="center">%</th><th class="center">Result</th><th class="center"></th></tr></thead><tbody>`;
+  data.forEach(r => {
+    const cls = r.decision.toLowerCase();
+    html += `<tr><td class="product">${escapeHTML(r.product)}</td><td class="center">${r.sComm ?? "—"}</td><td class="center">${r.sDemand ?? "—"}</td><td class="center">${r.sAngles ?? "—"}</td><td class="center">${r.sProb ?? "—"}</td><td class="center">${r.sConc ?? "—"}</td><td class="center score">${r.total}/${r.max}</td><td class="center">${Math.round(r.pct*100)}%</td><td class="center"><span class="badge ${cls}">${r.decision}</span></td><td class="center"><button class="row-del" onclick="deleteRecord(${r.id})">×</button></td></tr>`;
+  });
+  html += `</tbody></table></div>`;
+  container.innerHTML = html;
+}
+
+function deleteRecord(id) { if (!confirm("ลบรายการนี้?")) return; setTracker(getTracker().filter(r => r.id !== id)); renderTracker(); updateTrackerCount(); showToast("ลบแล้ว"); }
+function clearAll() { if (!confirm("ล้างข้อมูล Tracker ทั้งหมด?")) return; if (!confirm("แน่ใจ?")) return; setTracker([]); renderTracker(); updateTrackerCount(); showToast("ล้างข้อมูลทั้งหมดแล้ว"); }
+
+function exportCSV() {
+  const data = getTracker();
+  if (data.length === 0) { showToast("ยังไม่มีข้อมูลให้ export"); return; }
+  const headers = ["Date","Product","Commission%","Comm Score","GMV 7d%","GMV 30d%","Demand Score","Creators","Angles","Angles Score","CR%","Prob Score","Concentration%","Conc Score","Total","Max","%","Decision"];
+  const rows = data.map(r => [new Date(r.timestamp).toLocaleDateString("th-TH"), r.product, r.commission ?? "", r.sComm ?? "", r.gmv7 ?? "", r.gmv30 ?? "", r.sDemand ?? "", r.creators ?? "", r.angles.join(" | "), r.sAngles ?? "", r.cr ?? "", r.sProb ?? "", r.conc ?? "", r.sConc ?? "", r.total, r.max, Math.round(r.pct*100) + "%", r.decision]);
+  const csv = [headers, ...rows].map(row => row.map(cell => { const s = String(cell); return s.includes(",") || s.includes('"') ? `"${s.replace(/"/g,'""')}"` : s; }).join(",")).join("\n");
+  const blob = new Blob(["\uFEFF" + csv], {type: "text/csv;charset=utf-8;"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = `lego-scorecard-${new Date().toISOString().split("T")[0]}.csv`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast("Export CSV แล้ว");
+}
+
+function updateTrackerCount() { document.getElementById("trackerCount").textContent = getTracker().length; }
+function escapeHTML(s) { return s.replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function showToast(msg) { document.getElementById("toastMsg").textContent = msg; const t = document.getElementById("toast"); t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 2500); }
+
+document.querySelectorAll(".filter-block input").forEach(el => el.addEventListener("input", updateAll));
+const urlParams = new URLSearchParams(window.location.search);
+const token = urlParams.get("token");
+if (token) verifyToken(token);
+else if (checkSession()) showApp();
+else document.getElementById("emailInput").focus();
+updateAll();
+</script>
+</body>
+</html>
