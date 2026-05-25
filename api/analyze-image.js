@@ -175,84 +175,52 @@ function normalizeParsedData(parsed) {
 }
 
 const EXTRACTION_PROMPT = `
-คุณคือระบบ OCR สำหรับอ่านภาพหน้าจอ TikTok Shop "Promotion info" ของ affiliate
+You are an OCR extraction engine for TikTok Shop Affiliate "Promotion info" screenshots.
 
-เป้าหมายหลัก:
-อ่านตัวเลขจากภาพให้มากที่สุด แล้วกรอกค่าแบบ best estimate
-ห้ามปล่อย null ถ้าตัวเลขยังพอมองเห็นหรือเดาได้จากบริบท
+Your only job:
+Read visible numbers from the image and return ONE valid JSON object.
 
-บทบาทของคุณ:
-คุณไม่ใช่ผู้ตรวจเอกสารที่ต้องรอความชัด 100%
-คุณคือ assistant ที่ช่วยกรอกฟอร์มให้เร็วที่สุด
-ถ้าเห็นตัวเลขประมาณ 60-70% ให้ใส่ค่าที่น่าจะใช่ที่สุด
-แล้วค่อยใส่ field นั้นใน uncertain_fields
+Critical behavior:
+- Extract as many visible fields as possible.
+- If a number is visible or partially visible, return your best estimate.
+- Do NOT leave a field null just because confidence is not perfect.
+- Use null ONLY when the field is not visible in the image.
+- If unsure, still return the best estimate and add the field name to uncertain_fields.
+- Return JSON only.
+- No markdown.
+- No explanation.
+- Your answer must start with { and end with }.
 
-กฎสำคัญที่สุด:
-1. ถ้ามองเห็นตัวเลขพอประมาณ ให้กรอกตัวเลข
-2. ใช้ null เฉพาะกรณีที่ช่องนั้นไม่อยู่ในภาพ หรือมองไม่ออกจริงๆ
-3. ถ้าไม่มั่นใจ ห้ามเว้นว่าง ให้ใส่ best guess แล้วใส่ชื่อ field ใน uncertain_fields
-4. ห้ามตอบคำอธิบาย
-5. ตอบ JSON เท่านั้น
-6. คำตอบต้องเริ่มด้วย { และจบด้วย } เท่านั้น
-7. ห้าม markdown
-8. ห้าม code fence
-9. ห้ามใช้ \`\`\`json
+Read these fields:
+1. productName = product name if visible
+2. commissionRate = number from "commission rate", e.g. "10%" -> 10
+3. stock = number from "In stock"
+4. orders7d = Orders if the screenshot says Last 7 days
+5. orders30d = Orders if the screenshot says Last 30 days
+6. ctr = CTR percentage number, e.g. "8.5%" -> 8.5
+7. atc7d = Add-to-cart users if screenshot says Last 7 days
+8. atc30d = Add-to-cart users if screenshot says Last 30 days
+9. creators7d = Number of creators if screenshot says Last 7 days
+10. creators30d = Number of creators if screenshot says Last 30 days
+11. reviews = review count if visible
+12. period = "7d" if Last 7 days, "30d" if Last 30 days, otherwise null
 
-โครงสร้างภาพ TikTok Promotion info:
-- บนสุดอาจมี "Earn ฿XX.XX per sale"
-- ใต้ลงมาอาจมี "X% commission rate"
-- มุมขวาบนอาจมีตัวเลข stock + "In stock"
-- Product trends มี 4 ช่อง:
-  - Orders
-  - CTR
-  - Number of creators
-  - Add-to-cart users
-- ภาพอาจเป็น Last 7 days หรือ Last 30 days
+Important TikTok layout rules:
+- In Product trends, read the BIG main number.
+- Ignore small numbers next to ▲ or ▼ because those are trend changes.
+- Example: "30 ▲1" means value = 30, not 1.
+- Example: "82 ▼51" means value = 82, not 51.
+- Example: "310 ▲91" means value = 310, not 91.
+- Remove commas: "1,234" -> 1234.
+- Convert K/M: "1.2K" -> 1200, "1.5M" -> 1500000.
+- CTR and commission should be numbers only, no % sign.
 
-กฎการอ่านตัวเลข:
-- เอาเฉพาะตัวเลขใหญ่ที่เป็นค่าหลัก
-- ห้ามเอาตัวเลขเล็กที่อยู่ข้างลูกศร ▲ หรือ ▼ เพราะเป็น trend
-- ตัวอย่าง "30 ▲1" ให้เอา 30
-- ตัวอย่าง "82 ▼51" ให้เอา 82
-- ตัวอย่าง "310 ▲91" ให้เอา 310
-- CTR เช่น "8.5%" ให้เอา 8.5
-- commission เช่น "10% commission rate" ให้เอา 10
-- ตัวเลข comma เช่น "1,234" ให้เอา 1234
-- ถ้าเห็น "K" เช่น "1.2K" ให้แปลงเป็น 1200
-- ถ้าเห็น "M" เช่น "1.5M" ให้แปลงเป็น 1500000
+If there are two uploaded images:
+- One may be Last 7 days and one may be Last 30 days.
+- Combine both into the same JSON object.
+- Fill both 7d and 30d fields when visible.
 
-กฎการเดาแบบปลอดภัย:
-- ถ้าตัวเลขเบลอแต่เห็นรูปทรงชัด ให้ใส่ค่าที่น่าจะใช่ที่สุด
-- ถ้าไม่แน่ใจระหว่าง 82 กับ 32 ให้เลือกค่าที่ดูใกล้ภาพที่สุด แล้วใส่ field ใน uncertain_fields
-- ถ้าช่องอยู่ในภาพแต่ตัวเลขอ่านยากมาก ให้พยายามเดา best estimate ก่อน
-- ใช้ null เฉพาะเมื่อไม่มีช่องนั้นในภาพจริงๆ หรือถูกบังจนอ่านไม่ได้เลย
-
-กฎ period:
-- ถ้าภาพแสดง "Last 7 days" ให้ใส่ orders7d, atc7d, creators7d และ period = "7d"
-- ถ้าภาพแสดง "Last 30 days" ให้ใส่ orders30d, atc30d, creators30d และ period = "30d"
-- ถ้า upload มี 2 ภาพ คือ 7d + 30d ให้รวมค่าทั้งสองช่วงใน JSON เดียว
-- commissionRate, ctr, stock, reviews ใส่ได้เสมอถ้าเห็น
-- ถ้าไม่เห็น period ชัด แต่เห็นข้อมูลชุดเดียว ให้กรอกตัวเลขที่อ่านได้ และ period = null
-
-Field mapping:
-- commissionRate = ตัวเลข % commission rate
-- orders7d = Orders ของ Last 7 days
-- orders30d = Orders ของ Last 30 days
-- ctr = CTR %
-- atc7d = Add-to-cart users ของ Last 7 days
-- atc30d = Add-to-cart users ของ Last 30 days
-- creators7d = Number of creators ของ Last 7 days
-- creators30d = Number of creators ของ Last 30 days
-- stock = In stock
-- reviews = จำนวนรีวิว ถ้าเห็น
-- productName = ชื่อสินค้า ถ้าเห็น
-
-ระดับ confidence:
-- high = อ่านตัวเลขหลักได้เกือบครบและชัด
-- medium = อ่านได้หลายช่อง แต่มีบางช่องเบลอ
-- low = อ่านได้บางช่อง หรือภาพไม่ชัดมาก
-
-ตอบ JSON shape นี้เท่านั้น:
+Return exactly this JSON shape:
 
 {
   "productName": "",
@@ -270,6 +238,7 @@ Field mapping:
   "confidence": "medium",
   "uncertain_fields": []
 }
+`;
 `;
 export default async function handler(req, res) {
   res.setHeader("Content-Type", "application/json");
