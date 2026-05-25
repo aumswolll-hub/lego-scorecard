@@ -77,32 +77,51 @@ async function checkAndIncrementUsage(email) {
 }
 
 // ─────────── Prompt สำหรับอ่านภาพ ───────────
-const EXTRACTION_PROMPT = `คุณคือระบบอ่านข้อมูลจากภาพหน้าจอ TikTok Shop "Promotion info" ของ affiliate
+const EXTRACTION_PROMPT = `คุณคือระบบอ่านตัวเลขจากภาพหน้าจอ TikTok Shop "Promotion info" ของ affiliate ความแม่นยำสำคัญมาก
 
-อ่านค่าต่อไปนี้จากภาพ (ถ้าเห็น) แล้วคืนเป็น JSON เท่านั้น ห้ามมีข้อความอื่น:
+ขั้นตอนการอ่าน (ทำตามนี้อย่างเคร่งครัด):
+1. มองหาคำว่า "Last 7 days" หรือ "Last 30 days" ที่ปุ่ม dropdown ก่อน — เพื่อรู้ว่าภาพนี้เป็นช่วงไหน
+2. อ่านตัวเลขหลักของแต่ละ metric ทีละตัว อย่างระมัดระวัง
 
+โครงสร้างภาพ TikTok Promotion info:
+- บนสุด: "Earn ฿XX.XX per sale" และใต้ลงมา "X% commission rate"
+- มุมขวาบน: ตัวเลขใหญ่ + "In stock" (เช่น "358 In stock")
+- ส่วน "Product trends" มี 4 ช่อง: Orders, CTR, Number of creators, Add-to-cart users
+- แต่ละช่องมี: ตัวเลขใหญ่ (ค่าหลัก) + ตัวเลขเล็กพร้อมลูกศร ▲/▼ (คือ trend ไม่ใช่ค่าหลัก!)
+
+กฎการอ่านตัวเลข (สำคัญที่สุด — ผิดบ่อย):
+- เอาเฉพาะ "ตัวเลขใหญ่" ที่เป็นค่าหลัก เช่น "30 ▲1" → เอา 30 (ห้ามเอา 1)
+- "82 ▼51" → เอา 82 (ห้ามเอา 51), "310 ▲91" → เอา 310
+- CTR เป็น % เช่น "8.5%" → เอา 8.5 (ตัวเลขเล็ก ▼2% คือ trend ห้ามเอา)
+- ตัวเลขที่มี comma เช่น "1,234" → เอา 1234 (ตัด comma)
+- In stock: "358" → 358
+- commission: "10% commission rate" → เอา 10
+
+ตรวจสอบตัวเอง: ก่อนตอบ ให้เทียบว่าตัวเลขที่อ่านสมเหตุสมผลมั้ย (เช่น ATC ควร > Orders, Orders ควร > 0)
+
+คืน JSON เท่านั้น ห้ามมีข้อความอื่น ห้ามมี markdown:
 {
-  "commission": <ตัวเลข % จาก "X% commission rate" หรือ null>,
-  "orders7": <Orders ช่วง Last 7 days หรือ null>,
-  "orders30": <Orders ช่วง Last 30 days หรือ null>,
-  "ctr": <ตัวเลข % จาก CTR หรือ null>,
-  "atc7": <Add-to-cart users 7 วัน หรือ null>,
-  "atc30": <Add-to-cart users 30 วัน หรือ null>,
-  "creators7": <Number of creators 7 วัน หรือ null>,
-  "creators30": <Number of creators 30 วัน หรือ null>,
-  "stock": <จำนวน In stock หรือ null>,
-  "period": <"7d" ถ้าภาพแสดง Last 7 days, "30d" ถ้า Last 30 days, หรือ null>,
-  "productName": <ชื่อสินค้า ถ้าเห็น หรือ null>
+  "commission": <number|null>,
+  "orders7": <number|null>,
+  "orders30": <number|null>,
+  "ctr": <number|null>,
+  "atc7": <number|null>,
+  "atc30": <number|null>,
+  "creators7": <number|null>,
+  "creators30": <number|null>,
+  "stock": <number|null>,
+  "period": <"7d"|"30d"|null>,
+  "productName": <string|null>,
+  "confidence": <"high"|"medium"|"low" — ความมั่นใจในการอ่านโดยรวม>,
+  "uncertain_fields": [<ชื่อ field ที่อ่านไม่ชัด/ไม่มั่นใจ เช่น "ctr">]
 }
 
-กฎสำคัญ:
-- ภาพ TikTok แสดงข้อมูลได้ทีละช่วง (7 วัน หรือ 30 วัน) ดังนั้นภาพเดียวมักมีแค่ orders/atc/creators ของช่วงเดียว
-- ถ้าภาพแสดง "Last 7 days" → ใส่ค่าใน orders7/atc7/creators7 และ orders30/atc30/creators30 = null
-- ถ้าภาพแสดง "Last 30 days" → ใส่ค่าใน orders30/atc30/creators30 และ 7 วัน = null
-- commission และ stock เหมือนกันทั้ง 2 ช่วง — ใส่ได้เสมอถ้าเห็น
-- ตัวเลขให้เอาเฉพาะค่าหลัก ไม่เอาเครื่องหมาย +/- ที่เป็น trend indicator (เช่น "30 ▲1" → เอา 30)
-- ถ้าอ่านไม่ออกหรือไม่เห็น → null
-- คืน JSON อย่างเดียว ไม่มี markdown ไม่มี \`\`\``;
+กฎ period:
+- ถ้าภาพแสดง "Last 7 days" → ใส่ค่าใน orders7/atc7/creators7, ส่วน *30 = null, period="7d"
+- ถ้าภาพแสดง "Last 30 days" → ใส่ค่าใน orders30/atc30/creators30, ส่วน *7 = null, period="30d"
+- commission + stock ใส่ได้เสมอถ้าเห็น (ไม่ขึ้นกับ period)
+- ถ้าอ่านช่องไหนไม่ชัด/ไม่แน่ใจ → ใส่ค่าที่เดาได้ดีที่สุด แล้วใส่ชื่อช่องนั้นใน uncertain_fields
+- ถ้าอ่านไม่ออกเลยจริงๆ → null`;
 
 export default async function handler(req, res) {
   res.setHeader("Content-Type", "application/json");
@@ -169,7 +188,7 @@ export default async function handler(req, res) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-haiku-4-5",
+        model: "claude-sonnet-4-6", // Sonnet = อ่านภาพแม่นกว่า Haiku มาก
         max_tokens: 1000,
         messages: [{ role: "user", content }],
       }),
