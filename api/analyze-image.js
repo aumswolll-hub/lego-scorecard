@@ -1,15 +1,6 @@
 // ════════════════════════════════════════════════
-// /api/analyze-image.js — อ่านภาพ TikTok Promotion info → คืนตัวเลข
-// ใช้ Claude vision อ่านตัวเลขจากภาพ
-//
-// วาง: api/analyze-image.js ใน repo
-// ต้องมี env:
-//   ANTHROPIC_API_KEY
-//   SUPABASE_URL
-//   SUPABASE_SERVICE_ROLE_KEY
-//
-// Optional env:
-//   AUTOFILL_MONTHLY_LIMIT   default 30
+// /api/analyze-image.js
+// อ่านภาพ TikTok Shop Promotion Info → คืนตัวเลขสำหรับ LEGO Scorecard
 // ════════════════════════════════════════════════
 
 export const config = {
@@ -45,6 +36,7 @@ async function getEmailFromSession(token) {
   if (!res.ok) return null;
 
   const rows = await res.json();
+
   if (!rows.length) return null;
   if (new Date(rows[0].expires_at) < new Date()) return null;
 
@@ -60,6 +52,7 @@ async function hasMethodAccess(email) {
     if (!res.ok) return false;
 
     const rows = await res.json();
+
     return rows.length > 0 && rows[0].has_method === true;
   } catch (error) {
     console.error("[analyze-image] hasMethodAccess error:", error);
@@ -82,12 +75,18 @@ async function checkAndIncrementUsage(email) {
   }
 
   if (used >= MONTHLY_LIMIT) {
-    return { allowed: false, used, limit: MONTHLY_LIMIT };
+    return {
+      allowed: false,
+      used,
+      limit: MONTHLY_LIMIT,
+    };
   }
 
-  await sb(`autofill_usage?on_conflict=email,month`, {
+  await sb("autofill_usage?on_conflict=email,month", {
     method: "POST",
-    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+    headers: {
+      Prefer: "resolution=merge-duplicates,return=minimal",
+    },
     body: JSON.stringify({
       email,
       month,
@@ -96,7 +95,11 @@ async function checkAndIncrementUsage(email) {
     }),
   });
 
-  return { allowed: true, used: used + 1, limit: MONTHLY_LIMIT };
+  return {
+    allowed: true,
+    used: used + 1,
+    limit: MONTHLY_LIMIT,
+  };
 }
 
 function safeJsonParse(text) {
@@ -126,18 +129,31 @@ function safeJsonParse(text) {
 
 function normalizeNumber(value) {
   if (value === null || value === undefined || value === "") return null;
-  if (typeof value === "number") return Number.isFinite(value) ? value : null;
 
-  const cleaned = String(value)
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+
+  let text = String(value).trim().toUpperCase();
+
+  let multiplier = 1;
+
+  if (text.includes("K")) multiplier = 1000;
+  if (text.includes("M")) multiplier = 1000000;
+
+  const cleaned = text
     .replace(/,/g, "")
     .replace(/%/g, "")
+    .replace(/K/g, "")
+    .replace(/M/g, "")
     .replace(/[^\d.-]/g, "")
     .trim();
 
   if (!cleaned) return null;
 
   const num = Number(cleaned);
-  return Number.isFinite(num) ? num : null;
+
+  return Number.isFinite(num) ? num * multiplier : null;
 }
 
 function normalizeParsedData(parsed) {
@@ -149,10 +165,10 @@ function normalizeParsedData(parsed) {
     ctr: normalizeNumber(parsed.ctr),
     atc7d: normalizeNumber(parsed.atc7d ?? parsed.atc7),
     atc30d: normalizeNumber(parsed.atc30d ?? parsed.atc30),
-    stock: normalizeNumber(parsed.stock),
-    reviews: normalizeNumber(parsed.reviews),
     creators7d: normalizeNumber(parsed.creators7d ?? parsed.creators7),
     creators30d: normalizeNumber(parsed.creators30d ?? parsed.creators30),
+    stock: normalizeNumber(parsed.stock),
+    reviews: normalizeNumber(parsed.reviews),
     period: parsed.period || null,
   };
 
@@ -169,77 +185,75 @@ function normalizeParsedData(parsed) {
     ok: true,
     data,
     missingFields,
-    confidence: parsed.confidence || "low",
+    confidence: parsed.confidence || "medium",
     uncertainFields: parsed.uncertain_fields || parsed.uncertainFields || [],
   };
 }
 
-const EXTRACTION_PROMPT = `
-You are an OCR extraction engine for TikTok Shop Affiliate "Promotion info" screenshots.
+const EXTRACTION_PROMPT = [
+  "You are an OCR extraction engine for TikTok Shop Affiliate Promotion Info screenshots.",
+  "",
+  "Your job is to read visible numbers from the image and return one valid JSON object.",
+  "",
+  "Critical rules:",
+  "- Return JSON only.",
+  "- No markdown.",
+  "- No explanation.",
+  "- The answer must start with { and end with }.",
+  "- Extract as many visible fields as possible.",
+  "- If a number is visible or partially visible, return your best estimate.",
+  "- Do not leave a field null just because confidence is not perfect.",
+  "- Use null only when the field is not visible in the image.",
+  "- If unsure, still return the best estimate and add the field name to uncertain_fields.",
+  "",
+  "Fields to extract:",
+  "- productName: product name if visible.",
+  "- commissionRate: number from commission rate. Example: 10% becomes 10.",
+  "- stock: number from In stock.",
+  "- orders7d: Orders if screenshot shows Last 7 days.",
+  "- orders30d: Orders if screenshot shows Last 30 days.",
+  "- ctr: CTR percentage number. Example: 8.5% becomes 8.5.",
+  "- atc7d: Add-to-cart users if screenshot shows Last 7 days.",
+  "- atc30d: Add-to-cart users if screenshot shows Last 30 days.",
+  "- creators7d: Number of creators if screenshot shows Last 7 days.",
+  "- creators30d: Number of creators if screenshot shows Last 30 days.",
+  "- reviews: review count if visible.",
+  "- period: 7d if Last 7 days, 30d if Last 30 days, otherwise null.",
+  "",
+  "TikTok layout rules:",
+  "- In Product trends, read the big main number.",
+  "- Ignore small numbers next to up or down arrows because those are trend changes.",
+  "- Example: 30 up 1 means value is 30, not 1.",
+  "- Example: 82 down 51 means value is 82, not 51.",
+  "- Example: 310 up 91 means value is 310, not 91.",
+  "- Remove commas. Example: 1,234 becomes 1234.",
+  "- Convert K and M. Example: 1.2K becomes 1200. Example: 1.5M becomes 1500000.",
+  "- CTR and commission should be numbers only, no percent sign.",
+  "",
+  "If two images are uploaded:",
+  "- One may be Last 7 days and one may be Last 30 days.",
+  "- Combine both into the same JSON object.",
+  "- Fill both 7d and 30d fields when visible.",
+  "",
+  "Return exactly this JSON shape:",
+  "{",
+  '  "productName": "",',
+  '  "commissionRate": null,',
+  '  "orders7d": null,',
+  '  "orders30d": null,',
+  '  "ctr": null,',
+  '  "atc7d": null,',
+  '  "atc30d": null,',
+  '  "creators7d": null,',
+  '  "creators30d": null,',
+  '  "stock": null,',
+  '  "reviews": null,',
+  '  "period": null,',
+  '  "confidence": "medium",',
+  '  "uncertain_fields": []',
+  "}",
+].join("\n");
 
-Your only job:
-Read visible numbers from the image and return ONE valid JSON object.
-
-Critical behavior:
-- Extract as many visible fields as possible.
-- If a number is visible or partially visible, return your best estimate.
-- Do NOT leave a field null just because confidence is not perfect.
-- Use null ONLY when the field is not visible in the image.
-- If unsure, still return the best estimate and add the field name to uncertain_fields.
-- Return JSON only.
-- No markdown.
-- No explanation.
-- Your answer must start with { and end with }.
-
-Read these fields:
-1. productName = product name if visible
-2. commissionRate = number from "commission rate", e.g. "10%" -> 10
-3. stock = number from "In stock"
-4. orders7d = Orders if the screenshot says Last 7 days
-5. orders30d = Orders if the screenshot says Last 30 days
-6. ctr = CTR percentage number, e.g. "8.5%" -> 8.5
-7. atc7d = Add-to-cart users if screenshot says Last 7 days
-8. atc30d = Add-to-cart users if screenshot says Last 30 days
-9. creators7d = Number of creators if screenshot says Last 7 days
-10. creators30d = Number of creators if screenshot says Last 30 days
-11. reviews = review count if visible
-12. period = "7d" if Last 7 days, "30d" if Last 30 days, otherwise null
-
-Important TikTok layout rules:
-- In Product trends, read the BIG main number.
-- Ignore small numbers next to ▲ or ▼ because those are trend changes.
-- Example: "30 ▲1" means value = 30, not 1.
-- Example: "82 ▼51" means value = 82, not 51.
-- Example: "310 ▲91" means value = 310, not 91.
-- Remove commas: "1,234" -> 1234.
-- Convert K/M: "1.2K" -> 1200, "1.5M" -> 1500000.
-- CTR and commission should be numbers only, no % sign.
-
-If there are two uploaded images:
-- One may be Last 7 days and one may be Last 30 days.
-- Combine both into the same JSON object.
-- Fill both 7d and 30d fields when visible.
-
-Return exactly this JSON shape:
-
-{
-  "productName": "",
-  "commissionRate": null,
-  "orders7d": null,
-  "orders30d": null,
-  "ctr": null,
-  "atc7d": null,
-  "atc30d": null,
-  "creators7d": null,
-  "creators30d": null,
-  "stock": null,
-  "reviews": null,
-  "period": null,
-  "confidence": "medium",
-  "uncertain_fields": []
-}
-`;
-`;
 export default async function handler(req, res) {
   res.setHeader("Content-Type", "application/json");
 
@@ -253,27 +267,34 @@ export default async function handler(req, res) {
   }
 
   if (!SUPABASE_URL || !SUPABASE_KEY) {
-    return res.status(500).json({
+    return res.status(200).json({
       success: false,
       ok: false,
       error: "config_error",
-      message: "ยังไม่ได้ตั้งค่า Supabase env",
+      message: "Missing Supabase environment variables",
     });
   }
 
   if (!ANTHROPIC_API_KEY) {
-    return res.status(500).json({
+    return res.status(200).json({
       success: false,
       ok: false,
       error: "config_error",
-      message: "ยังไม่ได้ตั้ง ANTHROPIC_API_KEY",
+      message: "Missing ANTHROPIC_API_KEY",
     });
   }
 
   let textOut = "";
+  let usageInfo = {
+    used: 0,
+    limit: MONTHLY_LIMIT,
+    unlimited: false,
+  };
 
   try {
-    const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body || {};
+    const body =
+      typeof req.body === "string" ? JSON.parse(req.body) : req.body || {};
+
     const sessionToken = req.headers["x-session-token"] || body.sessionToken;
     const images = body.images || [];
 
@@ -304,13 +325,13 @@ export default async function handler(req, res) {
         success: false,
         ok: false,
         error: "too_many",
-        message: "อัปโหลดได้สูงสุด 2 ภาพ (7d + 30d)",
+        message: "อัปโหลดได้สูงสุด 2 ภาพ",
       });
     }
 
     const unlimited = await hasMethodAccess(email);
 
-    let usageInfo = {
+    usageInfo = {
       used: 0,
       limit: MONTHLY_LIMIT,
       unlimited,
@@ -355,7 +376,7 @@ export default async function handler(req, res) {
       text: EXTRACTION_PROMPT,
     });
 
-    console.log("[analyze-image] calling Claude, email:", email);
+    console.log("[analyze-image] calling Claude");
 
     const aiRes = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -383,12 +404,12 @@ export default async function handler(req, res) {
 
       console.error("[analyze-image] Claude API error:", aiRes.status, errTxt);
 
-      return res.status(502).json({
+      return res.status(200).json({
         success: false,
         ok: false,
         error: "ai_error",
         message: `Claude API error ${aiRes.status}`,
-        detail: errTxt.slice(0, 500),
+        detail: errTxt.slice(0, 1000),
         usage: usageInfo,
       });
     }
@@ -416,22 +437,26 @@ export default async function handler(req, res) {
       usage: usageInfo,
     });
   } catch (error) {
-    console.error("[analyze-image] server/parse error:", error);
-    console.error("[analyze-image] raw output:", textOut);
+    console.error("[analyze-image] FULL ERROR:", error);
+    console.error("[analyze-image] ERROR NAME:", error?.name);
+    console.error("[analyze-image] ERROR MESSAGE:", error?.message);
+    console.error("[analyze-image] ERROR STACK:", error?.stack);
+    console.error("[analyze-image] RAW OUTPUT:", textOut);
 
     const isParseError =
-      error.message === "parse_error" ||
-      error.message === "empty_ai_response" ||
+      error?.message === "parse_error" ||
+      error?.message === "empty_ai_response" ||
       error instanceof SyntaxError;
 
-    return res.status(isParseError ? 200 : 500).json({
+    return res.status(200).json({
       success: false,
       ok: false,
-      error: isParseError ? "parse_error" : "server_error",
-      message: isParseError
-        ? "อ่านภาพไม่สำเร็จ: parse_error"
-        : String(error.message || error),
+      error: isParseError ? "parse_error" : "server_debug",
+      message: error?.message || String(error),
+      name: error?.name || null,
+      stack: error?.stack || null,
       raw: textOut || null,
+      usage: usageInfo,
     });
   }
 }
