@@ -175,32 +175,41 @@ function normalizeParsedData(parsed) {
 }
 
 const EXTRACTION_PROMPT = `
-คุณคือระบบอ่านตัวเลขจากภาพหน้าจอ TikTok Shop "Promotion info" ของ affiliate
+คุณคือระบบ OCR สำหรับอ่านภาพหน้าจอ TikTok Shop "Promotion info" ของ affiliate
 
-หน้าที่:
-อ่านค่าตัวเลขจากภาพ แล้วตอบกลับเป็น JSON เท่านั้น
+เป้าหมายหลัก:
+อ่านตัวเลขจากภาพให้มากที่สุด แล้วกรอกค่าแบบ best estimate
+ห้ามปล่อย null ถ้าตัวเลขยังพอมองเห็นหรือเดาได้จากบริบท
 
-สำคัญมาก:
-คำตอบต้องเริ่มด้วย { และจบด้วย } เท่านั้น
-ห้ามมี markdown
-ห้ามมี code fence
-ห้ามใช้ \`\`\`json
-ห้ามมีคำอธิบายก่อนหรือหลัง JSON
-ห้ามเขียนภาษาไทยนอก JSON
-ถ้าไม่เห็นข้อมูล ให้ใส่ null
+บทบาทของคุณ:
+คุณไม่ใช่ผู้ตรวจเอกสารที่ต้องรอความชัด 100%
+คุณคือ assistant ที่ช่วยกรอกฟอร์มให้เร็วที่สุด
+ถ้าเห็นตัวเลขประมาณ 60-70% ให้ใส่ค่าที่น่าจะใช่ที่สุด
+แล้วค่อยใส่ field นั้นใน uncertain_fields
+
+กฎสำคัญที่สุด:
+1. ถ้ามองเห็นตัวเลขพอประมาณ ให้กรอกตัวเลข
+2. ใช้ null เฉพาะกรณีที่ช่องนั้นไม่อยู่ในภาพ หรือมองไม่ออกจริงๆ
+3. ถ้าไม่มั่นใจ ห้ามเว้นว่าง ให้ใส่ best guess แล้วใส่ชื่อ field ใน uncertain_fields
+4. ห้ามตอบคำอธิบาย
+5. ตอบ JSON เท่านั้น
+6. คำตอบต้องเริ่มด้วย { และจบด้วย } เท่านั้น
+7. ห้าม markdown
+8. ห้าม code fence
+9. ห้ามใช้ \`\`\`json
 
 โครงสร้างภาพ TikTok Promotion info:
 - บนสุดอาจมี "Earn ฿XX.XX per sale"
 - ใต้ลงมาอาจมี "X% commission rate"
-- อาจมี "In stock" พร้อมตัวเลข stock
-- Product trends มีช่อง:
+- มุมขวาบนอาจมีตัวเลข stock + "In stock"
+- Product trends มี 4 ช่อง:
   - Orders
   - CTR
   - Number of creators
   - Add-to-cart users
 - ภาพอาจเป็น Last 7 days หรือ Last 30 days
 
-กฎการอ่าน:
+กฎการอ่านตัวเลข:
 - เอาเฉพาะตัวเลขใหญ่ที่เป็นค่าหลัก
 - ห้ามเอาตัวเลขเล็กที่อยู่ข้างลูกศร ▲ หรือ ▼ เพราะเป็น trend
 - ตัวอย่าง "30 ▲1" ให้เอา 30
@@ -209,14 +218,39 @@ const EXTRACTION_PROMPT = `
 - CTR เช่น "8.5%" ให้เอา 8.5
 - commission เช่น "10% commission rate" ให้เอา 10
 - ตัวเลข comma เช่น "1,234" ให้เอา 1234
-- ATC ควรมักมากกว่า Orders
-- ถ้าอ่านไม่ชัด ให้เดาค่าที่ดีที่สุด แต่ใส่ชื่อ field ใน uncertain_fields
+- ถ้าเห็น "K" เช่น "1.2K" ให้แปลงเป็น 1200
+- ถ้าเห็น "M" เช่น "1.5M" ให้แปลงเป็น 1500000
+
+กฎการเดาแบบปลอดภัย:
+- ถ้าตัวเลขเบลอแต่เห็นรูปทรงชัด ให้ใส่ค่าที่น่าจะใช่ที่สุด
+- ถ้าไม่แน่ใจระหว่าง 82 กับ 32 ให้เลือกค่าที่ดูใกล้ภาพที่สุด แล้วใส่ field ใน uncertain_fields
+- ถ้าช่องอยู่ในภาพแต่ตัวเลขอ่านยากมาก ให้พยายามเดา best estimate ก่อน
+- ใช้ null เฉพาะเมื่อไม่มีช่องนั้นในภาพจริงๆ หรือถูกบังจนอ่านไม่ได้เลย
 
 กฎ period:
 - ถ้าภาพแสดง "Last 7 days" ให้ใส่ orders7d, atc7d, creators7d และ period = "7d"
 - ถ้าภาพแสดง "Last 30 days" ให้ใส่ orders30d, atc30d, creators30d และ period = "30d"
 - ถ้า upload มี 2 ภาพ คือ 7d + 30d ให้รวมค่าทั้งสองช่วงใน JSON เดียว
-- commissionRate และ stock ใส่ได้เสมอถ้าเห็น
+- commissionRate, ctr, stock, reviews ใส่ได้เสมอถ้าเห็น
+- ถ้าไม่เห็น period ชัด แต่เห็นข้อมูลชุดเดียว ให้กรอกตัวเลขที่อ่านได้ และ period = null
+
+Field mapping:
+- commissionRate = ตัวเลข % commission rate
+- orders7d = Orders ของ Last 7 days
+- orders30d = Orders ของ Last 30 days
+- ctr = CTR %
+- atc7d = Add-to-cart users ของ Last 7 days
+- atc30d = Add-to-cart users ของ Last 30 days
+- creators7d = Number of creators ของ Last 7 days
+- creators30d = Number of creators ของ Last 30 days
+- stock = In stock
+- reviews = จำนวนรีวิว ถ้าเห็น
+- productName = ชื่อสินค้า ถ้าเห็น
+
+ระดับ confidence:
+- high = อ่านตัวเลขหลักได้เกือบครบและชัด
+- medium = อ่านได้หลายช่อง แต่มีบางช่องเบลอ
+- low = อ่านได้บางช่อง หรือภาพไม่ชัดมาก
 
 ตอบ JSON shape นี้เท่านั้น:
 
@@ -233,11 +267,10 @@ const EXTRACTION_PROMPT = `
   "stock": null,
   "reviews": null,
   "period": null,
-  "confidence": "low",
+  "confidence": "medium",
   "uncertain_fields": []
 }
 `;
-
 export default async function handler(req, res) {
   res.setHeader("Content-Type", "application/json");
 
