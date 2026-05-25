@@ -1183,6 +1183,15 @@ tbody td.score { font-family: 'Fraunces', serif; font-weight: 700; font-size: 15
   .autofill-drop { padding: 18px; }
 }
 
+/* highlight fields that were auto-filled */
+.input-wrap.autofilled input, input.autofilled { background: rgba(196,154,74,0.15) !important; border-color: var(--gold) !important; transition: background 0.4s; }
+.input-wrap.uncertain input, input.uncertain { background: rgba(240,138,133,0.18) !important; border-color: var(--red) !important; }
+.autofill-legend { font-size: 11px; margin-top: 8px; display: flex; gap: 16px; flex-wrap: wrap; }
+.autofill-legend span { display: inline-flex; align-items: center; gap: 5px; color: rgba(245,239,230,0.7); }
+.autofill-legend .dot { width: 10px; height: 10px; display: inline-block; border: 1px solid; }
+.autofill-legend .dot.gold { background: rgba(196,154,74,0.4); border-color: var(--gold); }
+.autofill-legend .dot.red { background: rgba(240,138,133,0.4); border-color: var(--red); }
+
 /* Hide field groups based on mode */
 .mode-section { display: none; }
 .mode-section.active { display: block; }
@@ -2425,44 +2434,67 @@ async function handleAutofillFiles(files) {
       usageTxt = `<div class="af-usage">✦ METHOD member — ไม่จำกัด</div>`;
     }
 
+    const legend = `<div class="autofill-legend"><span><span class="dot gold"></span>ช่องที่ AI กรอกให้</span><span><span class="dot red"></span>ช่องที่ AI ไม่มั่นใจ — เช็คก่อน</span></div>`;
+
     if (filled === 0) {
       afStatus("error", `⚠ อ่านภาพได้ แต่ไม่เจอตัวเลขที่ต้องการ — ลองภาพที่ชัดกว่า หรือกรอกมือ${usageTxt}`);
     } else {
-      afStatus("success", `✓ กรอกให้แล้ว ${filled} ช่อง — ตรวจสอบความถูกต้องก่อนบันทึก${usageTxt}`);
+      const conf = result.data.confidence;
+      const uncertainCount = (result.data.uncertain_fields || []).length;
+      let confNote = "";
+      if (conf === "low" || uncertainCount >= 3) {
+        confNote = ` <strong style="color:#F0A8A4">⚠ ภาพอาจไม่ชัด — ตรวจตัวเลขให้ดีก่อนบันทึก</strong>`;
+      } else if (conf === "medium" || uncertainCount > 0) {
+        confNote = ` — มี ${uncertainCount} ช่องที่ควรเช็ค`;
+      }
+      afStatus("success", `✓ กรอกให้แล้ว ${filled} ช่อง${confNote}${legend}${usageTxt}`);
     }
   } catch (e) {
     afStatus("error", "⚠ เกิดข้อผิดพลาด — ลองใหม่ หรือกรอกมือ");
   }
 }
 
-// เอาค่าจาก API ไปใส่ช่อง (เฉพาะค่าที่ไม่ใช่ null)
+// เอาค่าจาก API ไปใส่ช่อง (เฉพาะค่าที่ไม่ใช่ null) + ไฮไลต์
 function applyAutofillData(d) {
   let count = 0;
-  const setIf = (id, val) => {
+  const uncertain = new Set(d.uncertain_fields || []);
+
+  // ล้าง highlight เก่าก่อน
+  clearAutofillHighlights();
+
+  const setIf = (id, val, fieldKey) => {
     if (val !== null && val !== undefined && val !== "") {
       const el = document.getElementById(id);
-      if (el) { el.value = val; count++; }
+      if (el) {
+        el.value = val;
+        count++;
+        // ไฮไลต์: แดงถ้า uncertain, ทองถ้าปกติ
+        const cls = (fieldKey && uncertain.has(fieldKey)) ? "uncertain" : "autofilled";
+        el.classList.add(cls);
+      }
     }
   };
 
-  // product name
-  if (d.productName) setIf("productName", d.productName);
+  if (d.productName) setIf("productName", d.productName, "productName");
+  setIf("v_commission", d.commission, "commission");
+  setIf("v_ctr", d.ctr, "ctr");
+  setIf("v_stock", d.stock, "stock");
+  setIf("v_orders7", d.orders7, "orders7");
+  setIf("v_orders30", d.orders30, "orders30");
+  setIf("v_atc7", d.atc7, "atc7");
+  setIf("v_atc30", d.atc30, "atc30");
+  setIf("v_creators7", d.creators7, "creators7");
+  setIf("v_creators30", d.creators30, "creators30");
 
-  setIf("v_commission", d.commission);
-  setIf("v_ctr", d.ctr);
-  setIf("v_stock", d.stock);
-
-  // 7d / 30d — ถ้า API แยก period มาให้
-  setIf("v_orders7", d.orders7);
-  setIf("v_orders30", d.orders30);
-  setIf("v_atc7", d.atc7);
-  setIf("v_atc30", d.atc30);
-  setIf("v_creators7", d.creators7);
-  setIf("v_creators30", d.creators30);
-
-  // trigger recalculation
   updateAll();
   return count;
+}
+
+// ล้าง highlight (ตอนผู้ใช้แก้ค่าเอง หรือ scan ใหม่)
+function clearAutofillHighlights() {
+  document.querySelectorAll(".autofilled, .uncertain").forEach(el => {
+    el.classList.remove("autofilled", "uncertain");
+  });
 }
 
 // ═════ CREATOR INSIGHT (10x value — explain what the score means) ═════
@@ -3248,7 +3280,11 @@ function updateTrackerCount() { document.getElementById("trackerCount").textCont
 function escapeHTML(s) { return s.replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 function showToast(msg) { document.getElementById("toastMsg").textContent = msg; const t = document.getElementById("toast"); t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 2500); }
 
-document.querySelectorAll(".filter-block input").forEach(el => el.addEventListener("input", updateAll));
+document.querySelectorAll(".filter-block input").forEach(el => el.addEventListener("input", function() {
+  // เมื่อผู้ใช้แก้ค่าเอง = verify แล้ว → ลบ highlight ของช่องนั้น
+  this.classList.remove("autofilled", "uncertain");
+  updateAll();
+}));
 const urlParams = new URLSearchParams(window.location.search);
 const token = urlParams.get("token");
 if (token) verifyToken(token);
