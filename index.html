@@ -2355,8 +2355,10 @@ function updateAll() {
 }
 
 // ═════ AUTO-FILL FROM IMAGE ═════
+// ═════ AUTO-FILL FROM IMAGE ═════
 function afStatus(type, html) {
   const el = document.getElementById("autofillStatus");
+  if (!el) return;
   el.className = "autofill-status active " + type;
   el.innerHTML = html;
 }
@@ -2365,44 +2367,72 @@ function afStatus(type, html) {
 (function initAutofillDnd() {
   const drop = document.getElementById("autofillDrop");
   if (!drop) return;
+
   ["dragenter", "dragover"].forEach(ev =>
-    drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("dragover"); }));
+    drop.addEventListener(ev, (e) => {
+      e.preventDefault();
+      drop.classList.add("dragover");
+    })
+  );
+
   ["dragleave", "drop"].forEach(ev =>
-    drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove("dragover"); }));
+    drop.addEventListener(ev, (e) => {
+      e.preventDefault();
+      drop.classList.remove("dragover");
+    })
+  );
+
   drop.addEventListener("drop", (e) => {
     const files = e.dataTransfer.files;
     if (files && files.length) handleAutofillFiles(files);
   });
 })();
 
-// แปลงไฟล์ → base64
-// แปลงไฟล์ → base64 พร้อมบีบขนาด (กัน request ใหญ่เกิน + ลด API cost)
+// แปลงไฟล์ → base64 พร้อมบีบขนาด
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
+
     reader.onerror = reject;
+
     reader.onload = () => {
       const img = new Image();
+
       img.onerror = reject;
+
       img.onload = () => {
-        // resize: ด้านยาวสุดไม่เกิน 1600px (พอสำหรับอ่านตัวเลข + ไฟล์เล็กลงมาก)
         const MAX = 1600;
         let { width, height } = img;
+
         if (width > MAX || height > MAX) {
-          if (width > height) { height = Math.round(height * MAX / width); width = MAX; }
-          else { width = Math.round(width * MAX / height); height = MAX; }
+          if (width > height) {
+            height = Math.round(height * MAX / width);
+            width = MAX;
+          } else {
+            width = Math.round(width * MAX / height);
+            height = MAX;
+          }
         }
+
         const canvas = document.createElement("canvas");
-        canvas.width = width; canvas.height = height;
+        canvas.width = width;
+        canvas.height = height;
+
         const ctx = canvas.getContext("2d");
         ctx.drawImage(img, 0, 0, width, height);
-        // แปลงเป็น JPEG quality 0.85 (เล็กกว่า PNG มาก)
+
         const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
         const base64 = dataUrl.split(",")[1];
-        resolve({ media_type: "image/jpeg", data: base64 });
+
+        resolve({
+          media_type: "image/jpeg",
+          data: base64
+        });
       };
+
       img.src = reader.result;
     };
+
     reader.readAsDataURL(file);
   });
 }
@@ -2412,120 +2442,201 @@ async function handleAutofillFiles(files) {
     afStatus("error", "⚠ ต้อง login ก่อนใช้ auto-fill");
     return;
   }
+
   const fileArr = Array.from(files).slice(0, 2);
   if (fileArr.length === 0) return;
 
-  afStatus("loading", `<span class="autofill-spinner">⟳</span> กำลังอ่านภาพ ${fileArr.length} ภาพ...`);
+  afStatus(
+    "loading",
+    `<span class="autofill-spinner">⟳</span> กำลังอ่านภาพ ${fileArr.length} ภาพ...`
+  );
 
   try {
     const images = await Promise.all(fileArr.map(fileToBase64));
-    console.log("[autofill] images prepared:", images.length, "sizes:", images.map(i => Math.round(i.data.length/1024) + "KB"));
+
+    console.log(
+      "[autofill] images prepared:",
+      images.length,
+      "sizes:",
+      images.map(i => Math.round(i.data.length / 1024) + "KB")
+    );
 
     const res = await fetch("/api/analyze-image", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "x-session-token": currentSession.token },
-      body: JSON.stringify({ images }),
+      headers: {
+        "Content-Type": "application/json",
+        "x-session-token": currentSession.token
+      },
+      body: JSON.stringify({ images })
     });
 
     console.log("[autofill] response status:", res.status);
 
+    const rawText = await res.text();
     let result;
+
     try {
-      result = await res.json();
+      result = JSON.parse(rawText);
     } catch (parseErr) {
-      const txt = await res.text().catch(() => "");
-      console.error("[autofill] non-JSON response:", res.status, txt);
-      afStatus("error", `⚠ Server error (${res.status}) — ${txt.slice(0,100) || "ไม่มีรายละเอียด"}`);
+      console.error("[autofill] non-JSON response:", res.status, rawText);
+      afStatus(
+        "error",
+        `⚠ Server error (${res.status}) — ${rawText.slice(0, 300) || "ไม่มีรายละเอียด"}`
+      );
       return;
     }
 
     console.log("[autofill] result:", result);
 
-    if (res.status === 429) {
-      afStatus("error",
-        `⚠ ${result.message}<br>` +
+    if (res.status === 429 || result.error === "rate_limit") {
+      afStatus(
+        "error",
+        `⚠ ${result.message || "ใช้ auto-fill ครบแล้ว"}<br>` +
         `<span class="af-upsell" onclick="goToUpgrade(event)">อัปเกรด LEGO METHOD เพื่อใช้ auto-fill ไม่จำกัด →</span>`
       );
       return;
     }
-    if (res.status === 401) {
+
+    if (res.status === 401 || result.error === "unauthorized") {
       afStatus("error", "⚠ Session หมดอายุ — logout แล้ว login ใหม่");
       return;
     }
-    if (!res.ok || !result.ok) {
-      const detail = result.message || result.error || result.detail || `status ${res.status}`;
-      afStatus("error", `⚠ อ่านภาพไม่สำเร็จ: ${detail}<br><span style="font-size:11px;opacity:0.7">กรอกมือได้ตามปกติ</span>`);
+
+    if (!result.success && !result.ok) {
+      const detail =
+        result.message ||
+        result.error ||
+        result.detail ||
+        result.raw ||
+        `status ${res.status}`;
+
+      afStatus(
+        "error",
+        `⚠ อ่านภาพไม่สำเร็จ: ${String(detail).slice(0, 500)}<br><span style="font-size:11px;opacity:0.7">กรอกมือได้ตามปกติ</span>`
+      );
       return;
     }
 
-    // auto-fill ช่องจากผลลัพธ์
-    const filled = applyAutofillData(result.data);
+    const data = result.data || {};
+
+    window.__lastAutofillUncertainFields =
+      result.uncertainFields ||
+      result.uncertain_fields ||
+      data.uncertainFields ||
+      data.uncertain_fields ||
+      [];
+
+    const filled = applyAutofillData(data);
 
     let usageTxt = "";
+
     if (result.usage && !result.usage.unlimited) {
       usageTxt = `<div class="af-usage">ใช้ไป ${result.usage.used}/${result.usage.limit} ครั้งเดือนนี้</div>`;
     } else if (result.usage && result.usage.unlimited) {
       usageTxt = `<div class="af-usage">✦ METHOD member — ไม่จำกัด</div>`;
     }
 
-    const legend = `<div class="autofill-legend"><span><span class="dot gold"></span>ช่องที่ AI กรอกให้</span><span><span class="dot red"></span>ช่องที่ AI ไม่มั่นใจ — เช็คก่อน</span></div>`;
+    const legend =
+      `<div class="autofill-legend">` +
+      `<span><span class="dot gold"></span>ช่องที่ AI กรอกให้</span>` +
+      `<span><span class="dot red"></span>ช่องที่ AI ไม่มั่นใจ — เช็คก่อน</span>` +
+      `</div>`;
+
+    const conf = result.confidence || data.confidence || "medium";
+
+    const uncertainCount = (
+      result.uncertainFields ||
+      result.uncertain_fields ||
+      data.uncertainFields ||
+      data.uncertain_fields ||
+      []
+    ).length;
 
     if (filled === 0) {
-      afStatus("error", `⚠ อ่านภาพได้ แต่ไม่เจอตัวเลขที่ต้องการ — ลองภาพที่ชัดกว่า หรือกรอกมือ${usageTxt}`);
+      afStatus(
+        "error",
+        `⚠ AI อ่านภาพแล้ว แต่ field จาก backend ยังไม่ตรงกับช่องในหน้าเว็บ<br>` +
+        `<span style="font-size:11px;opacity:0.7">เปิด Console หรือ Vercel log แล้วดู result.data</span>` +
+        usageTxt
+      );
     } else {
-      const conf = result.data.confidence;
-      const uncertainCount = (result.data.uncertain_fields || []).length;
       let confNote = "";
+
       if (conf === "low" || uncertainCount >= 3) {
-        confNote = ` <strong style="color:#F0A8A4">⚠ ภาพอาจไม่ชัด — ตรวจตัวเลขให้ดีก่อนบันทึก</strong>`;
+        confNote =
+          ` <strong style="color:#F0A8A4">⚠ ภาพอาจไม่ชัด — ตรวจตัวเลขให้ดีก่อนบันทึก</strong>`;
       } else if (conf === "medium" || uncertainCount > 0) {
         confNote = ` — มี ${uncertainCount} ช่องที่ควรเช็ค`;
       }
-      afStatus("success", `✓ กรอกให้แล้ว ${filled} ช่อง${confNote}${legend}${usageTxt}`);
+
+      afStatus(
+        "success",
+        `✓ กรอกให้แล้ว ${filled} ช่อง${confNote}${legend}${usageTxt}`
+      );
     }
   } catch (e) {
     console.error("[autofill] error:", e);
-    afStatus("error", `⚠ เกิดข้อผิดพลาด: ${e.message || e} — ลองใหม่ หรือกรอกมือ`);
+    afStatus(
+      "error",
+      `⚠ เกิดข้อผิดพลาด: ${e.message || e} — ลองใหม่ หรือกรอกมือ`
+    );
   }
 }
 
-// เอาค่าจาก API ไปใส่ช่อง (เฉพาะค่าที่ไม่ใช่ null) + ไฮไลต์
+// เอาค่าจาก API ไปใส่ช่อง validation mode
 function applyAutofillData(d) {
   let count = 0;
-  const uncertain = new Set(d.uncertain_fields || []);
 
-  // ล้าง highlight เก่าก่อน
+  const uncertainList =
+    d.uncertain_fields ||
+    d.uncertainFields ||
+    window.__lastAutofillUncertainFields ||
+    [];
+
+  const uncertain = new Set(uncertainList);
+
   clearAutofillHighlights();
 
-  const setIf = (id, val, fieldKey) => {
+  const setIf = (id, val, fieldKeys) => {
     if (val !== null && val !== undefined && val !== "") {
       const el = document.getElementById(id);
+
       if (el) {
         el.value = val;
         count++;
-        // ไฮไลต์: แดงถ้า uncertain, ทองถ้าปกติ
-        const cls = (fieldKey && uncertain.has(fieldKey)) ? "uncertain" : "autofilled";
-        el.classList.add(cls);
+
+        const keys = Array.isArray(fieldKeys) ? fieldKeys : [fieldKeys];
+        const isUncertain = keys.some(k => uncertain.has(k));
+
+        el.classList.add(isUncertain ? "uncertain" : "autofilled");
+      } else {
+        console.warn("[autofill] input id not found:", id);
       }
     }
   };
 
-  if (d.productName) setIf("productName", d.productName, "productName");
-  setIf("v_commission", d.commission, "commission");
-  setIf("v_ctr", d.ctr, "ctr");
-  setIf("v_stock", d.stock, "stock");
-  setIf("v_orders7", d.orders7, "orders7");
-  setIf("v_orders30", d.orders30, "orders30");
-  setIf("v_atc7", d.atc7, "atc7");
-  setIf("v_atc30", d.atc30, "atc30");
-  setIf("v_creators7", d.creators7, "creators7");
-  setIf("v_creators30", d.creators30, "creators30");
+  // product name
+  setIf("productName", d.productName, ["productName"]);
+
+  // backend ใหม่ + fallback backend เก่า
+  setIf("v_commission", d.commissionRate ?? d.commission, ["commissionRate", "commission"]);
+  setIf("v_ctr", d.ctr, ["ctr"]);
+  setIf("v_stock", d.stock, ["stock"]);
+
+  setIf("v_orders7", d.orders7d ?? d.orders7, ["orders7d", "orders7"]);
+  setIf("v_orders30", d.orders30d ?? d.orders30, ["orders30d", "orders30"]);
+
+  setIf("v_atc7", d.atc7d ?? d.atc7, ["atc7d", "atc7"]);
+  setIf("v_atc30", d.atc30d ?? d.atc30, ["atc30d", "atc30"]);
+
+  setIf("v_creators7", d.creators7d ?? d.creators7, ["creators7d", "creators7"]);
+  setIf("v_creators30", d.creators30d ?? d.creators30, ["creators30d", "creators30"]);
 
   updateAll();
   return count;
 }
 
-// ล้าง highlight (ตอนผู้ใช้แก้ค่าเอง หรือ scan ใหม่)
+// ล้าง highlight
 function clearAutofillHighlights() {
   document.querySelectorAll(".autofilled, .uncertain").forEach(el => {
     el.classList.remove("autofilled", "uncertain");
