@@ -1,4 +1,3 @@
-cat > patch-force-lock-after-update.js <<'EOF'
 const fs = require("fs");
 const path = require("path");
 
@@ -41,6 +40,7 @@ const patch = `
     const benchmark = document.getElementById("benchmarkBlock");
     const actionPlan = document.getElementById("actionPlan");
     const upsell = document.getElementById("upsellResult");
+    const saveBtn = document.getElementById("saveBtn");
 
     if (totalEl) totalEl.innerHTML = "—<span class=\\"max\\"></span>";
     if (pctEl) pctEl.textContent = "—";
@@ -60,9 +60,9 @@ const patch = `
     if (benchmark) benchmark.classList.remove("active");
     if (actionPlan) actionPlan.classList.remove("active");
     if (upsell) upsell.classList.remove("active");
+    if (saveBtn) saveBtn.disabled = true;
   }
 
-  // Patch updateAll so every recalculation re-locks final result
   if (typeof updateAll === "function" && !window.__legoUpdateAllLocked) {
     const originalUpdateAll = updateAll;
 
@@ -75,7 +75,6 @@ const patch = `
     window.__legoUpdateAllLocked = true;
   }
 
-  // Patch applyAutofillData so upload always locks before/after filling
   if (typeof applyAutofillData === "function" && !window.__legoAutofillLocked) {
     const originalApplyAutofillData = applyAutofillData;
 
@@ -99,10 +98,8 @@ const patch = `
     window.__legoAutofillLocked = true;
   }
 
-  // Run immediately on page load
   setTimeout(forceHideFinalResult, 0);
 
-  // Safety: if anything renders result later, hide again
   setInterval(function () {
     if (!isUnlocked()) forceHideFinalResult();
   }, 500);
@@ -116,4 +113,3 @@ if (html.includes("HARD RESULT LOCK PATCH")) {
   fs.writeFileSync(filePath, html, "utf8");
   console.log("DONE: force lock after update patched");
 }
-EOF

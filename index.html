@@ -3852,6 +3852,96 @@ if (token) verifyToken(token);
 else if (checkSession()) showApp();
 else document.getElementById("emailInput").focus();
 updateAll();
+
+/* ── HARD RESULT LOCK PATCH ──
+   Prevent users from seeing final score / decision before submit/unlock.
+   This runs AFTER updateAll renders, so it overrides any earlier result leak.
+*/
+(function hardResultLockPatch() {
+  function isUnlocked() {
+    try {
+      return typeof resultUnlocked !== "undefined" && resultUnlocked === true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function forceHideFinalResult() {
+    if (isUnlocked()) return;
+
+    const totalEl = document.getElementById("totalDisplay");
+    const pctEl = document.getElementById("pctDisplay");
+    const decEl = document.getElementById("decisionDisplay");
+    const decTxt = document.getElementById("decisionText");
+    const msg = document.getElementById("resultMsg");
+    const benchmark = document.getElementById("benchmarkBlock");
+    const actionPlan = document.getElementById("actionPlan");
+    const upsell = document.getElementById("upsellResult");
+    const saveBtn = document.getElementById("saveBtn");
+
+    if (totalEl) totalEl.innerHTML = "—<span class=\"max\"></span>";
+    if (pctEl) pctEl.textContent = "—";
+
+    if (decEl) {
+      decEl.className = "result-decision empty";
+    }
+
+    if (decTxt) {
+      decTxt.textContent = "กดดูผลเพื่อตรวจสินค้า";
+    }
+
+    if (msg) {
+      msg.textContent = "ระบบกรอกข้อมูลให้แล้ว แต่ผลตรวจจะเปิดหลังจากกดดูผลเท่านั้น";
+    }
+
+    if (benchmark) benchmark.classList.remove("active");
+    if (actionPlan) actionPlan.classList.remove("active");
+    if (upsell) upsell.classList.remove("active");
+    if (saveBtn) saveBtn.disabled = true;
+  }
+
+  if (typeof updateAll === "function" && !window.__legoUpdateAllLocked) {
+    const originalUpdateAll = updateAll;
+
+    updateAll = function patchedUpdateAll() {
+      const result = originalUpdateAll.apply(this, arguments);
+      setTimeout(forceHideFinalResult, 0);
+      return result;
+    };
+
+    window.__legoUpdateAllLocked = true;
+  }
+
+  if (typeof applyAutofillData === "function" && !window.__legoAutofillLocked) {
+    const originalApplyAutofillData = applyAutofillData;
+
+    applyAutofillData = function patchedApplyAutofillData() {
+      try {
+        if (typeof resultUnlocked !== "undefined") resultUnlocked = false;
+        document.body.classList.add("result-locked");
+      } catch (e) {}
+
+      const result = originalApplyAutofillData.apply(this, arguments);
+
+      try {
+        if (typeof resultUnlocked !== "undefined") resultUnlocked = false;
+        document.body.classList.add("result-locked");
+      } catch (e) {}
+
+      setTimeout(forceHideFinalResult, 0);
+      return result;
+    };
+
+    window.__legoAutofillLocked = true;
+  }
+
+  setTimeout(forceHideFinalResult, 0);
+
+  setInterval(function () {
+    if (!isUnlocked()) forceHideFinalResult();
+  }, 500);
+})();
+
 </script>
 </body>
 </html>
