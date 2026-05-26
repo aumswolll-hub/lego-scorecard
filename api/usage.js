@@ -1,11 +1,7 @@
 // ════════════════════════════════════════════════
 // /api/usage.js — Freemium + paid monthly scan usage
 //
-// GET  → คืน state ปัจจุบัน
-// POST → นับ scan +1 เมื่อ scan สำเร็จเท่านั้น
-//
-// Plan limits:
-// free = 3 scans
+// free = 3 scans/month
 // scanner_paid = 100 scans/month
 // lego_method = 300 scans/month
 // admin = unlimited
@@ -18,6 +14,10 @@ const FREE_LIMIT = parseInt(process.env.FREE_SCAN_LIMIT || "3", 10);
 const SCANNER_PAID_LIMIT = parseInt(process.env.SCANNER_PAID_SCAN_LIMIT || "100", 10);
 const LEGO_METHOD_LIMIT = parseInt(process.env.LEGO_METHOD_SCAN_LIMIT || "300", 10);
 const ADMIN_LIMIT = 999999;
+
+function currentMonth() {
+  return new Date().toISOString().slice(0, 7);
+}
 
 async function sb(path, options = {}) {
   return fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
@@ -48,48 +48,6 @@ async function getEmailFromSession(token) {
   return rows[0].email;
 }
 
-async function getOrCreateUsage(email) {
-  const res = await sb(
-    `scanner_user_usage?email=eq.${encodeURIComponent(email)}&select=*`
-  );
-
-  if (res.ok) {
-    const rows = await res.json();
-    if (rows.length) return rows[0];
-  }
-
-  const ins = await sb("scanner_user_usage", {
-    method: "POST",
-    headers: { Prefer: "return=representation" },
-    body: JSON.stringify({
-      email,
-      scans_used: 0,
-      free_scan_limit: FREE_LIMIT,
-      monthly_scan_limit: FREE_LIMIT,
-      is_paid: false,
-      is_lego_method_student: false,
-      is_admin: false,
-      plan: "free",
-    }),
-  });
-
-  if (ins.ok) {
-    const rows = await ins.json();
-    if (rows.length) return rows[0];
-  }
-
-  return {
-    email,
-    scans_used: 0,
-    free_scan_limit: FREE_LIMIT,
-    monthly_scan_limit: FREE_LIMIT,
-    is_paid: false,
-    is_lego_method_student: false,
-    is_admin: false,
-    plan: "free",
-  };
-}
-
 async function checkCustomerPaid(email) {
   try {
     const res = await sb(
@@ -113,21 +71,7 @@ async function checkCustomerPaid(email) {
   }
 }
 
-function getPlanLimit(plan, isPaid, isStudent, isAdmin, usageLimit) {
-  if (isAdmin || plan === "admin") return ADMIN_LIMIT;
-
-  if (isStudent || plan === "lego_method") {
-    return Number(usageLimit || LEGO_METHOD_LIMIT);
-  }
-
-  if (isPaid || plan === "scanner_paid") {
-    return Number(usageLimit || SCANNER_PAID_LIMIT);
-  }
-
-  return FREE_LIMIT;
-}
-
-function computeState(usage, customerPaid) {
+function resolveEntitlement(usage, customerPaid) {
   const planFromDb = usage.plan || "free";
 
   const isAdmin = usage.is_admin === true || planFromDb === "admin";
@@ -140,92 +84,178 @@ function computeState(usage, customerPaid) {
   const isPaid =
     usage.is_paid === true ||
     customerPaid.paid === true ||
+    planFromDb === "scanner_paid" ||
     isStudent ||
-    isAdmin ||
-    planFromDb === "scanner_paid";
+    isAdmin;
 
   let plan = "free";
+  let limit = FREE_LIMIT;
 
-  if (isAdmin) plan = "admin";
-  else if (isStudent) plan = "lego_method";
-  else if (isPaid) plan = "scanner_paid";
-
-  const limit = getPlanLimit(
-    plan,
-    isPaid,
-    isStudent,
-    isAdmin,
-    usage.monthly_scan_limit || usage.free_scan_limit
-  );
-
-  const used = Number(usage.scans_used || 0);
-  const scansLeft = Math.max(0, limit - used);
-
-  let state;
-
-  if (isAdmin) state = "admin";
-  else if (isStudent) state = "lego_method_student";
-  else if (isPaid) state = "paid_scanner";
-  else if (used >= limit) state = "free_limit_reached";
-  else state = "logged_in_free";
+  if (isAdmin) {
+    plan = "admin";
+    limit = ADMIN_LIMIT;
+  } else if (isStudent) {
+    plan = "lego_method";
+    limit = LEGO_METHOD_LIMIT;
+  } else if (isPaid) {
+    plan = "scanner_paid";
+    limit = SCANNER_PAID_LIMIT;
+  }
 
   return {
-    email: usage.email,
-    scans_used: used,
-    free_scan_limit: limit,
-    monthly_scan_limit: limit,
-    scans_left: scansLeft,
-    is_paid: isPaid,
-    is_lego_method_student: isStudent,
-    is_admin: isAdmin,
     plan,
-    state,
-    can_scan: isAdmin || used < limit,
+    limit,
+    isAdmin,
+    isStudent,
+    isPaid,
   };
 }
 
-async function syncEntitlementIfNeeded(usage, customerPaid) {
-  let target = null;
+async function getOrCreateUsage(email) {
+  const res = await sb(
+    `scanner_user_usage?email=eq.${encodeURIComponent(email)}&select=*`
+  );
 
-  if (customerPaid.method && usage.plan !== "lego_method") {
-    target = {
-      plan: "lego_method",
-      is_paid: true,
-      is_lego_method_student: true,
-      monthly_scan_limit: LEGO_METHOD_LIMIT,
-      free_scan_limit: LEGO_METHOD_LIMIT,
-      updated_at: new Date().toISOString(),
-    };
-  } else if (
-    customerPaid.paid &&
-    !customerPaid.method &&
-    usage.plan !== "scanner_paid"
-  ) {
-    target = {
-      plan: "scanner_paid",
-      is_paid: true,
-      is_lego_method_student: false,
-      monthly_scan_limit: SCANNER_PAID_LIMIT,
-      free_scan_limit: SCANNER_PAID_LIMIT,
-      updated_at: new Date().toISOString(),
-    };
+  if (res.ok) {
+    const rows = await res.json();
+    if (rows.length) return rows[0];
   }
 
-  if (!target) return usage;
+  const month = currentMonth();
+
+  const ins = await sb("scanner_user_usage", {
+    method: "POST",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify({
+      email,
+      scans_used: 0,
+      usage_month: month,
+      free_scan_limit: FREE_LIMIT,
+      monthly_scan_limit: FREE_LIMIT,
+      is_paid: false,
+      is_lego_method_student: false,
+      is_admin: false,
+      plan: "free",
+    }),
+  });
+
+  if (ins.ok) {
+    const rows = await ins.json();
+    if (rows.length) return rows[0];
+  }
+
+  return {
+    email,
+    scans_used: 0,
+    usage_month: month,
+    free_scan_limit: FREE_LIMIT,
+    monthly_scan_limit: FREE_LIMIT,
+    is_paid: false,
+    is_lego_method_student: false,
+    is_admin: false,
+    plan: "free",
+  };
+}
+
+async function resetMonthIfNeeded(usage) {
+  const month = currentMonth();
+
+  if (usage.usage_month === month) return usage;
+
+  const patch = {
+    scans_used: 0,
+    usage_month: month,
+    updated_at: new Date().toISOString(),
+  };
 
   await sb(`scanner_user_usage?email=eq.${encodeURIComponent(usage.email)}`, {
     method: "PATCH",
     headers: { Prefer: "return=minimal" },
-    body: JSON.stringify(target),
+    body: JSON.stringify(patch),
   });
 
-  return { ...usage, ...target };
+  return {
+    ...usage,
+    ...patch,
+  };
+}
+
+async function syncEntitlement(usage, entitlement) {
+  const desired = {
+    plan: entitlement.plan,
+    is_paid: entitlement.isPaid,
+    is_lego_method_student: entitlement.isStudent,
+    is_admin: entitlement.isAdmin,
+    monthly_scan_limit: entitlement.limit,
+    free_scan_limit: entitlement.limit,
+  };
+
+  const needsPatch =
+    usage.plan !== desired.plan ||
+    usage.is_paid !== desired.is_paid ||
+    usage.is_lego_method_student !== desired.is_lego_method_student ||
+    usage.is_admin !== desired.is_admin ||
+    Number(usage.monthly_scan_limit || 0) !== desired.monthly_scan_limit ||
+    Number(usage.free_scan_limit || 0) !== desired.free_scan_limit;
+
+  if (!needsPatch) return usage;
+
+  const patch = {
+    ...desired,
+    updated_at: new Date().toISOString(),
+  };
+
+  await sb(`scanner_user_usage?email=eq.${encodeURIComponent(usage.email)}`, {
+    method: "PATCH",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify(patch),
+  });
+
+  return {
+    ...usage,
+    ...patch,
+  };
+}
+
+function computeState(usage, entitlement) {
+  const used = Number(usage.scans_used || 0);
+  const limit = entitlement.limit;
+  const scansLeft = Math.max(0, limit - used);
+
+  let state = "logged_in_free";
+
+  if (entitlement.isAdmin) state = "admin";
+  else if (entitlement.isStudent) state = "lego_method_student";
+  else if (entitlement.isPaid) state = "paid_scanner";
+  else if (used >= limit) state = "free_limit_reached";
+
+  return {
+    email: usage.email,
+    usage_month: usage.usage_month || currentMonth(),
+    scans_used: used,
+    monthly_scan_limit: limit,
+    free_scan_limit: limit,
+    scans_left: scansLeft,
+    is_paid: entitlement.isPaid,
+    is_lego_method_student: entitlement.isStudent,
+    is_admin: entitlement.isAdmin,
+    plan: entitlement.plan,
+    state,
+    can_scan: entitlement.isAdmin || used < limit,
+  };
 }
 
 export default async function handler(req, res) {
   res.setHeader("Content-Type", "application/json");
 
   try {
+    if (!SUPABASE_URL || !SUPABASE_KEY) {
+      return res.status(500).json({
+        error: "config_error",
+        message: "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY",
+      });
+    }
+
     const sessionToken =
       req.headers["x-session-token"] ||
       (req.body && req.body.sessionToken) ||
@@ -241,16 +271,19 @@ export default async function handler(req, res) {
     }
 
     let usage = await getOrCreateUsage(email);
-    const customerPaid = await checkCustomerPaid(email);
+    usage = await resetMonthIfNeeded(usage);
 
-    usage = await syncEntitlementIfNeeded(usage, customerPaid);
+    const customerPaid = await checkCustomerPaid(email);
+    const entitlement = resolveEntitlement(usage, customerPaid);
+
+    usage = await syncEntitlement(usage, entitlement);
 
     if (req.method === "GET") {
-      return res.status(200).json(computeState(usage, customerPaid));
+      return res.status(200).json(computeState(usage, entitlement));
     }
 
     if (req.method === "POST") {
-      const state = computeState(usage, customerPaid);
+      const state = computeState(usage, entitlement);
 
       if (!state.can_scan) {
         return res.status(403).json({
@@ -280,8 +313,11 @@ export default async function handler(req, res) {
       });
 
       const newState = computeState(
-        { ...usage, scans_used: newCount },
-        customerPaid
+        {
+          ...usage,
+          scans_used: newCount,
+        },
+        entitlement
       );
 
       return res.status(200).json({
@@ -294,6 +330,8 @@ export default async function handler(req, res) {
       error: "method_not_allowed",
     });
   } catch (err) {
+    console.error("[usage] server error:", err);
+
     return res.status(500).json({
       error: "server_error",
       message: String(err),
