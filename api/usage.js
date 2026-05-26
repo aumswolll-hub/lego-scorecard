@@ -5,6 +5,11 @@
 // scanner_paid = 100 scans/month
 // lego_method = 300 scans/month
 // admin = unlimited
+//
+// IMPORTANT:
+// customers.active = login/account status only
+// customers.is_paid = paid Scanner
+// customers.has_method = LEGO METHOD
 // ════════════════════════════════════════════════
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -63,7 +68,7 @@ async function checkCustomerPaid(email) {
     const c = rows[0];
 
     return {
-      paid: c.is_paid === true || c.active === true,
+      paid: c.is_paid === true,
       method: c.has_method === true,
     };
   } catch {
