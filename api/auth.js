@@ -1,5 +1,8 @@
-// /api/auth.js — Request magic link
-// POST { email } → checks Supabase, sends magic link via Resend
+// /api/auth.js — Request magic link (FREEMIUM: ใครก็ login ได้)
+// POST { email } → ส่ง magic link ทุก email (ไม่ต้องซื้อก่อน)
+//
+// เปลี่ยนจากเดิม: เดิมบล็อกคนที่ไม่มีใน customers
+// ตอนนี้: ใครก็ขอ link ได้ → track สิทธิ์ที่ usage.js แทน
 
 import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
@@ -11,6 +14,11 @@ const supabase = createClient(
 );
 const resend = new Resend(process.env.RESEND_API_KEY);
 
+// validate email format
+function isValidEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -18,31 +26,19 @@ export default async function handler(req, res) {
 
   try {
     const { email } = req.body;
-    if (!email || typeof email !== 'string') {
-      return res.status(400).json({ error: 'Email required' });
+    if (!email || typeof email !== 'string' || !isValidEmail(email.trim())) {
+      return res.status(400).json({ error: 'กรุณาใส่อีเมลที่ถูกต้อง' });
     }
     const normalizedEmail = email.trim().toLowerCase();
 
-    // 1. Check if email exists in customers table (added by Stripe webhook)
-    const { data: customer, error: customerErr } = await supabase
-      .from('customers')
-      .select('email, active')
-      .eq('email', normalizedEmail)
-      .single();
+    // ── FREEMIUM: ไม่เช็คว่าซื้อรึยัง — ใครก็ login ได้ ──
+    // (เดิมตรงนี้บล็อกคนที่ไม่มีใน customers — ลบออกแล้ว)
 
-    if (customerErr || !customer || !customer.active) {
-      // Don't reveal whether email exists — return generic message
-      // But for development, you can return specific error:
-      return res.status(404).json({
-        error: 'ไม่พบ email นี้ในระบบ — กรุณาใช้ email ที่ซื้อคอร์ส'
-      });
-    }
-
-    // 2. Generate magic link token (random 32 bytes)
+    // 1. Generate magic link token
     const token = crypto.randomBytes(32).toString('hex');
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 min
 
-    // 3. Store token in Supabase
+    // 2. Store token
     const { error: tokenErr } = await supabase
       .from('magic_tokens')
       .insert({
@@ -57,24 +53,24 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'เกิดข้อผิดพลาด' });
     }
 
-    // 4. Build magic link
+    // 3. Build magic link
     const appUrl = process.env.APP_URL || `https://${req.headers.host}`;
     const magicLink = `${appUrl}/?token=${token}`;
 
-    // 5. Send email via Resend
+    // 4. Send email via Resend
     await resend.emails.send({
       from: process.env.EMAIL_FROM || 'LEGO Method <onboarding@resend.dev>',
       to: normalizedEmail,
-      subject: 'เข้าสู่ระบบ LEGO Scorecard',
+      subject: 'เข้าสู่ระบบ LEGO Scanner',
       html: `
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px; color: #0F0F0F;">
-          <div style="background: #0F0F0F; color: #F5EFE6; padding: 8px 14px; display: inline-block; font-weight: 700; font-size: 11px; letter-spacing: 0.15em; margin-bottom: 24px;">LEGO METHOD™</div>
+          <div style="background: #0F0F0F; color: #F5EFE6; padding: 8px 14px; display: inline-block; font-weight: 700; font-size: 11px; letter-spacing: 0.15em; margin-bottom: 24px;">LEGO SCANNER</div>
           <h1 style="font-size: 32px; line-height: 1.1; margin: 0 0 16px; letter-spacing: -0.02em;">
             เข้าสู่ระบบ<br>
-            <span style="color: #C8312B; font-style: italic; font-weight: 500;">Scorecard</span>
+            <span style="color: #C8312B; font-style: italic; font-weight: 500;">Scanner</span>
           </h1>
           <p style="color: #6B6B6B; font-size: 14px; line-height: 1.6; margin-bottom: 32px;">
-            คลิกปุ่มด้านล่างเพื่อเข้าสู่ระบบ LEGO Scorecard<br>
+            คลิกปุ่มด้านล่างเพื่อเข้าสู่ระบบ LEGO Scanner<br>
             ลิงก์นี้ใช้ได้ภายใน <strong>15 นาที</strong> และใช้ได้ <strong>ครั้งเดียว</strong>
           </p>
           <a href="${magicLink}" style="display: inline-block; background: #C8312B; color: #F5EFE6; padding: 14px 32px; text-decoration: none; font-weight: 600; font-size: 14px; letter-spacing: 0.1em; text-transform: uppercase;">
