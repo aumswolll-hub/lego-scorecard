@@ -1693,7 +1693,7 @@ tbody td.score { font-family: 'Fraunces', serif; font-weight: 700; font-size: 15
         <div class="pc-name">LEGO SCANNER</div>
         <div class="pc-price"><span id="pwScannerPrice">1,990</span> บาท</div>
         <ul class="pc-benefits">
-          <li>สแกนสินค้าเพิ่มได้ ไม่จำกัด</li>
+          <li>สแกนสินค้าได้ <strong>100 scans/เดือน</strong></li>
           <li>เห็นคะแนนเต็มทั้ง 7 จุด</li>
           <li>บันทึกประวัติสินค้า + Tracker</li>
           <li>เรียงลำดับสินค้าที่ควรทำก่อน</li>
@@ -1710,7 +1710,7 @@ tbody td.score { font-family: 'Fraunces', serif; font-weight: 700; font-size: 15
         <div class="pc-price"><span id="pwMethodPrice">8,990</span> บาท</div>
         <div class="pc-tagline">ได้ Scanner เต็ม + ระบบทำคลิปทั้งหมด</div>
         <ul class="pc-benefits">
-          <li><strong>ได้ LEGO SCANNER ตัวเต็ม</strong></li>
+          <li><strong>ได้ LEGO SCANNER 300 scans/เดือน</strong></li>
           <li>ระบบเลือกสินค้า test / scale / drop</li>
           <li>ระบบคิดมุมคลิปจากสินค้า</li>
           <li>โครงสร้าง Hook / Body / CTA</li>
@@ -2040,16 +2040,27 @@ async function loadUsageState() {
 // นับ scan (เรียกเมื่อ scan สำเร็จเท่านั้น)
 async function incrementScan() {
   if (!currentSession?.token) return;
-  // paid/student ไม่ต้องนับ
-  if (usageState && usageState.is_paid) return;
+
+  // admin เท่านั้นที่ไม่ต้องนับ usage
+  // scanner_paid และ lego_method ต้องนับตาม monthly limit
+  if (usageState && (usageState.is_admin || usageState.plan === "admin" || usageState.state === "admin")) return;
+
   try {
     const res = await fetch("/api/usage", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "x-session-token": currentSession.token },
+      headers: {
+        "Content-Type": "application/json",
+        "x-session-token": currentSession.token
+      },
     });
+
     if (res.ok || res.status === 403) {
       usageState = await res.json();
       applyUsageStateToUI();
+
+      if (res.status === 403 || usageState.blocked || !usageState.can_scan) {
+        showPaywall();
+      }
     }
   } catch (e) {
     console.error("[usage] increment error:", e);
@@ -2074,17 +2085,41 @@ function applyUsageStateToUI() {
 function updateScanCounter() {
   const el = document.getElementById("scanCounter");
   if (!el || !usageState) return;
-  if (usageState.is_paid) {
-    el.innerHTML = usageState.is_lego_method_student
-      ? `<span class="sc-badge student">✦ LEGO METHOD</span>`
-      : `<span class="sc-badge paid">✓ Scanner เต็ม</span>`;
+
+  const plan = usageState.plan || "free";
+  const state = usageState.state || "";
+  const used = Number(usageState.scans_used || 0);
+  const limit = Number(usageState.monthly_scan_limit || usageState.free_scan_limit || 3);
+  const left = Number(usageState.scans_left ?? Math.max(0, limit - used));
+
+  if (plan === "admin" || state === "admin" || usageState.is_admin) {
+    el.innerHTML = `<span class="sc-badge student">Admin · Unlimited</span>`;
     return;
   }
-  const left = usageState.scans_left;
+
+  if (plan === "lego_method" || state === "lego_method_student" || usageState.is_lego_method_student) {
+    el.innerHTML = `<span class="sc-badge student">✦ LEGO METHOD · เหลือ ${left}/${limit} scans</span>`;
+    return;
+  }
+
+  if (plan === "scanner_paid" || state === "paid_scanner") {
+    el.innerHTML = `<span class="sc-badge paid">✓ Scanner Paid · เหลือ ${left}/${limit} scans</span>`;
+    return;
+  }
+
   let txt, cls;
-  if (left <= 0) { txt = "ใช้ฟรีครบแล้ว"; cls = "out"; }
-  else if (left === 1) { txt = "scan ฟรีครั้งสุดท้าย"; cls = "last"; }
-  else { txt = `ใช้ฟรีเหลือ ${left}/${usageState.free_scan_limit} scans`; cls = "ok"; }
+
+  if (left <= 0) {
+    txt = "ใช้ฟรีครบแล้ว";
+    cls = "out";
+  } else if (left === 1) {
+    txt = "scan ฟรีครั้งสุดท้าย";
+    cls = "last";
+  } else {
+    txt = `ใช้ฟรีเหลือ ${left}/${limit} scans`;
+    cls = "ok";
+  }
+
   el.innerHTML = `<span class="sc-badge ${cls}">${txt}</span>`;
 }
 
@@ -2688,7 +2723,10 @@ async function handleAutofillFiles(files) {
     if (result.usage && !result.usage.unlimited) {
       usageTxt = `<div class="af-usage">ใช้ไป ${result.usage.used}/${result.usage.limit} ครั้งเดือนนี้</div>`;
     } else if (result.usage && result.usage.unlimited) {
-      usageTxt = `<div class="af-usage">✦ METHOD member — ไม่จำกัด</div>`;
+      usageTxt = `<div class="af-usage">✦ Admin · Unlimited</div>`;
+    } else if (usageState && usageState.is_paid) {
+      const planLabel = usageState.plan === "lego_method" ? "LEGO METHOD" : "Scanner Paid";
+      usageTxt = `<div class="af-usage">✦ ${planLabel} — เหลือ ${usageState.scans_left ?? "—"}/${usageState.monthly_scan_limit ?? "—"} scans</div>`;
     }
 
     const legend = `<div class="autofill-legend"><span><span class="dot gold"></span>ช่องที่ AI กรอกให้</span><span><span class="dot red"></span>ช่องที่ AI ไม่มั่นใจ — เช็คก่อน</span></div>`;
