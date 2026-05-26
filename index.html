@@ -3642,7 +3642,7 @@ function saveProduct() {
   incrementScan();
 
   showToast(`บันทึก "${name}" แล้ว — ${record.decision}`);
-  if (confirm(`บันทึก "${name}" แล้ว ✓\n\nผลลัพธ์: ${record.decision} (${record.total}/${record.max} = ${Math.round(record.pct*100)}%)\n\nต้องการล้างข้อมูลเพื่อตรวจสินค้าตัวต่อไปมั้ย?`)) clearForm();
+  // confirm popup removed for cleaner UX
 }
 
 function clearForm() {
