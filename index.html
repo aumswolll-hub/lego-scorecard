@@ -2885,7 +2885,7 @@ function fileToBase64(file) {
   });
 }
 
-async async function handleAutofillFiles(files) {
+async function handleAutofillFiles(files) {
   if (!currentSession?.token) {
     afStatus("error", "⚠ ต้อง login ก่อนใช้ auto-fill");
     return;
