@@ -1356,32 +1356,32 @@ tbody td.score { font-family: 'Fraunces', serif; font-weight: 700; font-size: 15
 <div id="loginScreen">
   <div class="login-card">
     <div class="login-mark">LEGO METHOD™</div>
-    <h1 class="serif">ตรวจสินค้า<br><em>ก่อนทำคลิป</em></h1>
-    <p class="sub">อัปโหลดรูป Promotion Info จาก TikTok Shop แล้วให้ระบบช่วยบอกว่าสินค้านี้ควร TEST / RISKY / DROP — ทดลองใช้ฟรี 3 scans</p>
+    <h1 class="serif">เช็กสินค้า<br><em>ก่อนทำคลิป</em></h1>
+    <p class="sub">อัปโหลดรูป Promotion Info จาก TikTok Shop แล้วให้ระบบช่วยดูว่าสินค้านี้ “น่าทำ / ลองเบา ๆ / ข้ามก่อน” — ทดลองใช้ฟรี 3 ครั้ง</p>
     <label class="field-label">Email เพื่อรับลิงก์เข้าใช้งาน</label>
     <input type="email" id="emailInput" placeholder="you@example.com" autocomplete="email">
     <div class="login-error" id="loginError"></div>
     <div class="login-success" id="loginSuccess"></div>
-    <button class="login-btn" id="loginBtn" onclick="requestMagicLink()">ลองสแกนฟรี 3 ครั้ง</button>
+    <button class="login-btn" id="loginBtn" onclick="requestMagicLink()">ลองตรวจสินค้าฟรี 3 ครั้ง</button>
 
     <div class="login-proof">
       <div class="proof-row">
         <span class="proof-k">SCANNER</span>
-        <span class="proof-v">บอกว่าสินค้าน่าเล่นไหม</span>
+        <span class="proof-v">ช่วยเช็กว่าสินค้านี้คุ้มทำไหม</span>
       </div>
       <div class="proof-row">
         <span class="proof-k">METHOD</span>
-        <span class="proof-v">สอนว่าหลังจากเจอสินค้าแล้ว ทำคลิปยังไงให้ขาย</span>
+        <span class="proof-v">สอนว่าหลังจากเจอสินค้าที่ใช่แล้ว ต้องทำคลิปยังไงให้ขาย</span>
       </div>
     </div>
 
     <div class="login-steps">
       <div><strong>1</strong><span>ใส่ email</span></div>
       <div><strong>2</strong><span>อัปโหลดรูปสินค้า</span></div>
-      <div><strong>3</strong><span>รู้เลยว่าควร TEST / RISKY / DROP</span></div>
+      <div><strong>3</strong><span>รู้เลยว่าสินค้านี้น่าทำ ลองเบา ๆ หรือควรข้าม</span></div>
     </div>
 
-    <p class="hint"><strong>ใช้ฟรี 3 scans</strong> · ไม่ต้องผูกบัตร · ใช้ข้อมูลจริงจาก TikTok Shop<br>ถ้าคุณซื้อ Scanner หรือ LEGO METHOD แล้ว ระบบจะปลดล็อกสิทธิ์ตามแผนให้อัตโนมัติ</p>
+    <p class="hint"><strong>ใช้ฟรี 3 ครั้ง</strong> · ไม่ต้องผูกบัตร · ใช้ข้อมูลจริงจาก TikTok Shop<br>ถ้าคุณซื้อ Scanner หรือ LEGO METHOD แล้ว ระบบจะปลดล็อกสิทธิ์ตามแผนให้อัตโนมัติ</p>
   </div>
 </div>
 
@@ -1410,7 +1410,7 @@ tbody td.score { font-family: 'Fraunces', serif; font-weight: 700; font-size: 15
   </div>
 
   <div class="view active" id="view-scorecard">
-    <div class="page-header"><div><h2 class="serif">ตรวจสินค้า<em> ของคุณ</em></h2><div class="sub">กรอกข้อมูล — ระบบจะตัดสินใจให้</div></div></div>
+    <div class="page-header"><div><h2 class="serif">ตรวจสินค้า<em> ของคุณ</em></h2><div class="sub">กรอกข้อมูลหรืออัปโหลดรูป — ระบบช่วยบอกว่าควรทำต่อไหม</div></div></div>
 
     <!-- Credit timer banner (shown when credit active) -->
     <div class="credit-banner hidden" id="creditBanner">
@@ -1432,7 +1432,7 @@ tbody td.score { font-family: 'Fraunces', serif; font-weight: 700; font-size: 15
         <h4>SCANNER เลือก<em> สนามรบ</em> — METHOD สอน<em> ให้ชนะ</em></h4>
         <p>เครื่องมือนี้บอกว่าสินค้าน่าเล่นมั้ย — แต่เมื่อรู้ว่าเล่นได้แล้ว ขั้นต่อไปคือทำคอนเทนต์ที่ขายได้จริง</p>
       </div>
-      <a href="#" onclick="goToUpgrade(event)" class="dash-link">ดูระบบเต็ม →</a>
+      <a href="#" onclick="goToUpgrade(event)" class="dash-link">ดู LEGO METHOD →</a>
     </div>
 
     <div class="scorecard-layout">
@@ -1475,16 +1475,16 @@ tbody td.score { font-family: 'Fraunces', serif; font-weight: 700; font-size: 15
       <div class="autofill-head">
         <span class="autofill-icon">📸</span>
         <div class="autofill-headtext">
-          <div class="autofill-title">Auto-fill จากภาพ <span class="autofill-badge">เร็วกว่า 10 เท่า</span></div>
-          <div class="autofill-sub">อัปโหลด screenshot "Promotion info" จาก TikTok — ระบบกรอกให้อัตโนมัติ</div>
+          <div class="autofill-title">กรอกตัวเลขจากภาพอัตโนมัติ <span class="autofill-badge">ไม่ต้องกรอกเอง</span></div>
+          <div class="autofill-sub">อัปโหลดรูป Promotion Info จาก TikTok Shop — ระบบช่วยอ่านตัวเลขให้</div>
         </div>
       </div>
       <div class="autofill-drop" id="autofillDrop" onclick="document.getElementById('autofillInput').click()">
         <input type="file" id="autofillInput" accept="image/*" multiple style="display:none" onchange="handleAutofillFiles(this.files)">
         <div class="autofill-drop-inner" id="autofillDropInner">
           <div class="autofill-drop-icon">⬆</div>
-          <div class="autofill-drop-text">คลิกเพื่อเลือกภาพ หรือลากภาพมาวาง</div>
-          <div class="autofill-drop-hint">รองรับ 1-2 ภาพ (Last 7 days + Last 30 days)</div>
+          <div class="autofill-drop-text">คลิกเพื่ออัปโหลดรูปสินค้า</div>
+          <div class="autofill-drop-hint">ใช้ได้ 1-2 รูป เช่น Last 7 days + Last 30 days</div>
         </div>
       </div>
       <div class="autofill-status" id="autofillStatus"></div>
@@ -1576,7 +1576,7 @@ tbody td.score { font-family: 'Fraunces', serif; font-weight: 700; font-size: 15
         <div><div class="result-label">Percentage</div><div class="result-value result-pct" id="pctDisplay">—</div></div>
         <div class="result-decision empty" id="decisionDisplay"><span class="label">Decision</span><span id="decisionText">กรอกข้อมูลเพื่อดูผล</span></div>
       </div>
-      <div class="result-message" id="resultMsg">≥75% = PICK · 50–74% = WAIT · &lt;50% = DROP</div>
+      <div class="result-message" id="resultMsg">≥75% = น่าทำ · 50–74% = ลองเบา ๆ ก่อน · &lt;50% = ข้ามก่อน</div>
     </div>
 
     <!-- Benchmark context — shows after result computed -->
@@ -1616,7 +1616,7 @@ tbody td.score { font-family: 'Fraunces', serif; font-weight: 700; font-size: 15
           <div class="lbl" id="upsellMetaRight">เล่นยังไงให้ขาย</div>
         </div>
       </div>
-      <a href="#" onclick="goToUpgrade(event)" class="upsell-result-btn" id="upsellResultBtn">ดูระบบเต็ม →</a>
+      <a href="#" onclick="goToUpgrade(event)" class="upsell-result-btn" id="upsellResultBtn">ดู LEGO METHOD →</a>
     </div>
 
     <div class="actions">
@@ -1646,8 +1646,8 @@ tbody td.score { font-family: 'Fraunces', serif; font-weight: 700; font-size: 15
           <div class="row"><span class="lbl">METHOD</span><span class="pro">เล่นยังไงให้ขาย</span></div>
         </div>
 
-        <a href="#" onclick="goToUpgrade(event)" class="upsell-btn">ดูระบบเต็ม →</a>
-        <div class="upsell-tagline">Scanner คือจุดเริ่ม — Method คือระบบที่พาไปขายจริง</div>
+        <a href="#" onclick="goToUpgrade(event)" class="upsell-btn">ดู LEGO METHOD →</a>
+        <div class="upsell-tagline">เครื่องมือตรวจคือจุดเริ่ม — METHOD คือระบบที่พาไปขายจริง</div>
       </aside>
 
     </div><!-- /.scorecard-layout -->
@@ -1714,7 +1714,7 @@ tbody td.score { font-family: 'Fraunces', serif; font-weight: 700; font-size: 15
       </ul>
       <p class="tracker-upsell-body" style="margin-bottom: 18px;">SCANNER ให้คำตอบข้อแรก — METHOD ให้คำตอบที่เหลือ</p>
       <div class="tracker-upsell-actions">
-        <a href="#" onclick="goToUpgrade(event)" class="tracker-upsell-btn">ดูระบบเต็ม →</a>
+        <a href="#" onclick="goToUpgrade(event)" class="tracker-upsell-btn">ดู LEGO METHOD →</a>
         <button class="tracker-upsell-dismiss" onclick="dismissTrackerUpsell()">ปิดไว้ก่อน</button>
       </div>
     </div>
@@ -1760,9 +1760,9 @@ tbody td.score { font-family: 'Fraunces', serif; font-weight: 700; font-size: 15
 <div class="paywall-overlay" id="paywallOverlay">
   <div class="paywall-modal">
     <div class="paywall-head">
-      <div class="paywall-tag">ใช้ครบ 3 SCANS ฟรีแล้ว</div>
-      <h2 class="paywall-title serif">เลือกสินค้าต่อ<em> แบบไม่เดา</em></h2>
-      <p class="paywall-sub">ถ้าจะคัดสินค้าต่อแบบจริงจัง เลือกแผนที่ใช่สำหรับคุณ</p>
+      <div class="paywall-tag">ตรวจฟรีครบ 3 ครั้งแล้ว</div>
+      <h2 class="paywall-title serif">ถ้าจะเลือกสินค้าต่อ<em> อย่าใช้แค่ความรู้สึก</em></h2>
+      <p class="paywall-sub">ปลดล็อกเครื่องมือตรวจสินค้า หรือเข้า LEGO METHOD เพื่อเรียนทั้งระบบตั้งแต่เลือกสินค้า → คิดมุมคลิป → ทำคลิปขาย</p>
     </div>
 
     <div class="paywall-options" id="paywallOptions">
@@ -1778,7 +1778,7 @@ tbody td.score { font-family: 'Fraunces', serif; font-weight: 700; font-size: 15
           <li>ลดความเสี่ยงก่อนเสียเวลาถ่ายคลิป</li>
           <li>เหมาะกับคนที่อยากคัดสินค้าให้แม่นขึ้น</li>
         </ul>
-        <a href="#" id="pwScannerBtn" class="pc-btn pc-btn-secondary" target="_blank" rel="noopener" onclick="return handlePaywallScanner(event)">ปลดล็อก Scanner</a>
+        <a href="#" id="pwScannerBtn" class="pc-btn pc-btn-secondary" target="_blank" rel="noopener" onclick="return handlePaywallScanner(event)">ปลดล็อกเครื่องมือตรวจสินค้า</a>
       </div>
 
       <!-- Option 2: LEGO METHOD (best value) -->
@@ -1797,7 +1797,7 @@ tbody td.score { font-family: 'Fraunces', serif; font-weight: 700; font-size: 15
           <li>เรียนผ่านวิดีโอ + ตัวอย่างจริง + framework ที่ทำตามได้</li>
           <li>เหมาะกับคนที่ไม่อยากแค่สแกน แต่อยากทำเงินจริงจากสินค้านั้น</li>
         </ul>
-        <a href="#" id="pwMethodBtn" class="pc-btn pc-btn-primary" target="_blank" rel="noopener" onclick="return handlePaywallMethod(event)">เอาระบบเต็ม →</a>
+        <a href="#" id="pwMethodBtn" class="pc-btn pc-btn-primary" target="_blank" rel="noopener" onclick="return handlePaywallMethod(event)">เข้า LEGO METHOD →</a>
       </div>
     </div>
 
@@ -2091,7 +2091,7 @@ async function requestMagicLink() {
     if (res.ok) { ok.textContent = "✓ ส่งลิงก์ไปที่ " + email + " — เช็ค inbox / spam"; document.getElementById("emailInput").value = ""; }
     else { err.textContent = data.error || "ไม่พบ email นี้ในระบบ"; }
   } catch (e) { err.textContent = "เกิดข้อผิดพลาด — ลองใหม่"; }
-  finally { btn.disabled = false; btn.textContent = "ลองสแกนฟรี 3 ครั้ง"; }
+  finally { btn.disabled = false; btn.textContent = "ลองตรวจสินค้าฟรี 3 ครั้ง"; }
 }
 document.getElementById("emailInput").addEventListener("keypress", e => { if (e.key === "Enter") requestMagicLink(); });
 
@@ -2245,13 +2245,13 @@ function updateScanCounter() {
   let txt, cls;
 
   if (left <= 0) {
-    txt = "ใช้ฟรีครบแล้ว";
+    txt = "ตรวจฟรีครบแล้ว";
     cls = "out";
   } else if (left === 1) {
-    txt = "scan ฟรีครั้งสุดท้าย";
+    txt = "ตรวจฟรีครั้งสุดท้าย";
     cls = "last";
   } else {
-    txt = `ใช้ฟรีเหลือ ${left}/${limit} scans`;
+    txt = `ตรวจฟรีเหลือ ${left}/${limit} scans`;
     cls = "ok";
   }
 
@@ -2486,9 +2486,9 @@ function showPaywall() {
     if (title) title.innerHTML = `คุณเลือกสินค้าได้แล้ว<em> อย่าจบแค่ Scanner</em>`;
     if (sub) sub.textContent = "ใช้เครดิต Scanner ที่จ่ายไปแล้ว อัปเกรดเป็น LEGO METHOD เพื่อได้ระบบทำคลิปเต็ม";
   } else {
-    if (tag) tag.textContent = "ใช้ครบ 3 SCANS ฟรีแล้ว";
-    if (title) title.innerHTML = `เลือกสินค้าต่อ<em> แบบไม่เดา</em>`;
-    if (sub) sub.textContent = "ถ้าจะคัดสินค้าต่อแบบจริงจัง เลือกแผนที่ใช่สำหรับคุณ";
+    if (tag) tag.textContent = "ตรวจฟรีครบ 3 ครั้งแล้ว";
+    if (title) title.innerHTML = `ถ้าจะเลือกสินค้าต่อ<em> อย่าใช้แค่ความรู้สึก</em>`;
+    if (sub) sub.textContent = "ปลดล็อกเครื่องมือตรวจสินค้า หรือเข้า LEGO METHOD เพื่อเรียนทั้งระบบตั้งแต่เลือกสินค้า → คิดมุมคลิป → ทำคลิปขาย";
   }
 
   document.getElementById("paywallOverlay").classList.add("active");
@@ -3303,31 +3303,31 @@ function updateValidation() {
     let decisionVal = "";
     if (pct >= 0.74) {
       decisionVal = "VALIDATED";
-      decEl.classList.add("pick"); decTxt.textContent = "✓ VALIDATED";
-      msg.textContent = "ยืนยันจาก TikTok App — สินค้าตัวนี้ขายจริง พร้อมเข้าได้";
+      decEl.classList.add("pick"); decTxt.textContent = "✓ น่าทำ";
+      msg.textContent = "ตัวเลขค่อนข้างดี เริ่มทำคลิปทดลองได้ แต่อย่าเพิ่งทุ่มทั้งหมด";
       upsellCard.classList.add("pick");
-      upsellTitle.innerHTML = 'สินค้านี้<em> validated</em> — แต่นั่นคือ 30% ของงาน';
-      upsellBody.textContent = "ข้อมูลจาก TikTok ยืนยันว่าตลาดมีจริง — เหลือแค่คุณทำคอนเทนต์ที่ดึงคนได้ Angle ที่ใช่, Hook ที่จับใน 3 วินาที, Script ที่พาคนไปกดสั่งซื้อ คือสิ่งที่ LEGO METHOD สอนคุณ";
+      upsellTitle.innerHTML = 'สินค้านี้<em>น่าทำ</em> — ขั้นต่อไปคือทำคลิปให้ขาย';
+      upsellBody.textContent = "ระบบช่วยบอกว่าสินค้านี้มีสัญญาณดีแล้ว แต่คำถามต่อไปคือจะใช้มุมไหน Hook อะไร และทำคลิปแบบไหนให้คนซื้อ นี่คือส่วนที่ LEGO METHOD สอนต่อ";
       upsellMetaL.textContent = "ยืนยันว่ามีตลาด";
       upsellMetaR.textContent = "สอนวิธีเข้าตลาด";
       upsellBtn.textContent = "ดูวิธีเข้าตลาดให้ชนะ →";
     } else if (pct >= 0.5) {
       decisionVal = "RISKY";
-      decEl.classList.add("wait"); decTxt.textContent = "⚠️ RISKY";
-      msg.textContent = "ตลาดมีจริง แต่มีจุดอ่อน — ต้องทดสอบก่อนทุ่ม";
+      decEl.classList.add("wait"); decTxt.textContent = "⚠️ ลองเบา ๆ ก่อน";
+      msg.textContent = "สินค้านี้มีโอกาส แต่ยังมีจุดที่ต้องระวัง อย่าเพิ่งซื้อของเยอะหรือทุ่มแรง";
       upsellCard.classList.add("wait");
-      upsellTitle.innerHTML = 'ตลาด<em> มีจริง</em> — แต่ห้ามทุ่ม';
-      upsellBody.textContent = "สินค้าเกรดนี้ขายได้ แต่มีจุดอ่อน (commission ต่ำ, CTR ลด, หรือ momentum ชะลอ) ห้ามใส่ effort มากก่อนทดสอบ LEGO METHOD สอนระบบทดสอบ 3-5 คลิป อ่านสัญญาณ แล้วตัดสินใจขยาย/ถอย";
+      upsellTitle.innerHTML = 'สินค้านี้<em>พอมีโอกาส</em> — แต่อย่าเพิ่งทุ่ม';
+      upsellBody.textContent = "สินค้าแบบนี้ต้องลองแบบควบคุมความเสี่ยง เริ่มจาก 1–2 คลิป หรือ 3–5 คลิปแบบมีระบบ แล้วค่อยดูสัญญาณก่อนทำต่อ";
       upsellMetaL.textContent = "บอกว่าเสี่ยง";
       upsellMetaR.textContent = "สอนระบบทดสอบ";
       upsellBtn.textContent = "เรียนระบบทดสอบสินค้า →";
     } else {
       decisionVal = "DEAD";
-      decEl.classList.add("drop"); decTxt.textContent = "✗ DEAD";
-      msg.textContent = "ตัวเลขจาก TikTok ไม่ดี — ทิ้งและหาตัวใหม่";
+      decEl.classList.add("drop"); decTxt.textContent = "✗ ข้ามก่อน";
+      msg.textContent = "ตัวเลขยังไม่คุ้มแรง ถ้าฝืนทำอาจเสียเวลาถ่ายคลิปฟรี";
       upsellCard.classList.add("drop");
-      upsellTitle.innerHTML = 'ตัวเลข<em> ไม่โกหก</em> — ทิ้งเถอะ';
-      upsellBody.textContent = "TikTok บอกชัดว่าสินค้านี้ไม่ทำเงิน — ทิ้งแล้วประหยัด 1-2 สัปดาห์ LEGO METHOD สอนระบบ Pre-Filter ที่ทำให้สินค้าที่ผ่านมาถึงคุณ ถูกกรองแล้วจาก signal ที่ใช่";
+      upsellTitle.innerHTML = 'ตัวนี้<em>ข้ามก่อน</em> ดีกว่าเสียเวลา';
+      upsellBody.textContent = "ดีแล้วที่รู้ก่อนลงแรง สินค้าที่ดูน่าขายไม่ได้แปลว่าคุ้มทำเสมอไป LEGO METHOD สอนวิธีคัดสินค้าตั้งแต่ต้น เพื่อไม่ต้องวนเลือกผิดซ้ำ ๆ";
       upsellMetaL.textContent = "บอกว่าตลาดตาย";
       upsellMetaR.textContent = "สอนหาตัวที่ใช่";
       upsellBtn.textContent = "หาสินค้าที่ใช่อย่างเป็นระบบ →";
