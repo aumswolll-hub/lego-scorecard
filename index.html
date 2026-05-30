@@ -4247,7 +4247,232 @@ updateAll();
 })();
 
 </script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+ <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<script>
+/*
+  LEGO SCANNER — SUPABASE PASSWORD LOGIN GUARD V2
+  Fix:
+  - ตั้งค่า currentSession ตัวจริง ไม่ใช่แค่ window.currentSession
+  - ทำให้ autofill ใช้ได้
+  - ทำให้ trackerKey() กลับมาใช้ email เดิม
+  - รองรับ session เก่า magic link + session ใหม่ Supabase
+*/
+
+(function () {
+  const SUPABASE_URL = "https://kdfyfnolxhcxswbotolq.supabase.co";
+  const SUPABASE_KEY = "sb_publishable_RxZbbxePB1RakFMi-h7LIQ_EVv0AS9_";
+
+  function createAuthClient() {
+    if (!window.supabase) return null;
+
+    return window.supabase.createClient(
+      SUPABASE_URL,
+      SUPABASE_KEY
+    );
+  }
+
+  function setRealCurrentSession(sessionObj) {
+    try {
+      currentSession = sessionObj;
+    } catch (e) {
+      console.warn("Could not set currentSession directly:", e);
+    }
+
+    window.currentSession = sessionObj;
+
+    try {
+      if (typeof SESSION_KEY !== "undefined") {
+        localStorage.setItem(SESSION_KEY, JSON.stringify(sessionObj));
+      } else {
+        localStorage.setItem("lego_session", JSON.stringify(sessionObj));
+      }
+    } catch (e) {
+      console.error("Could not persist session:", e);
+    }
+  }
+
+  async function checkSupabaseAccess() {
+    const sb = createAuthClient();
+
+    if (!sb) {
+      return {
+        allowed: false,
+        reason: "supabase_not_loaded"
+      };
+    }
+
+    const { data: sessionData, error: sessionError } = await sb.auth.getSession();
+
+    if (sessionError) {
+      console.error("Supabase session error:", sessionError);
+      return {
+        allowed: false,
+        reason: "session_error"
+      };
+    }
+
+    const session = sessionData && sessionData.session;
+
+    if (!session || !session.user || !session.user.email) {
+      return {
+        allowed: false,
+        reason: "not_logged_in"
+      };
+    }
+
+    const email = session.user.email.trim().toLowerCase();
+
+    const { data: customer, error: customerError } = await sb
+      .from("customers")
+      .select("email, active, deactivated_at")
+      .eq("email", email)
+      .eq("active", true)
+      .is("deactivated_at", null)
+      .maybeSingle();
+
+    if (customerError) {
+      console.error("Customer access check error:", customerError);
+      return {
+        allowed: false,
+        reason: "customer_error"
+      };
+    }
+
+    if (!customer) {
+      return {
+        allowed: false,
+        reason: "no_access"
+      };
+    }
+
+    return {
+      allowed: true,
+      email,
+      token: session.access_token,
+      customer
+    };
+  }
+
+  async function bootWithPasswordLoginV2() {
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const token = urlParams.get("token");
+
+      // 1) ถ้ามี magic link token เดิม ให้ปล่อยระบบเดิมทำงาน
+      if (token) {
+        if (typeof verifyToken === "function") {
+          verifyToken(token);
+        }
+        return;
+      }
+
+      // 2) ถ้ามี magic session เดิม ให้เข้าได้เหมือนเดิม
+      if (typeof checkSession === "function" && checkSession()) {
+        try {
+          const key = typeof SESSION_KEY !== "undefined" ? SESSION_KEY : "lego_session";
+          const oldSession = JSON.parse(localStorage.getItem(key) || "null");
+
+          if (oldSession && oldSession.email) {
+            setRealCurrentSession(oldSession);
+          }
+        } catch (e) {}
+
+        if (typeof showApp === "function") {
+          showApp();
+        }
+
+        if (typeof updateAll === "function") {
+          updateAll();
+        }
+
+        return;
+      }
+
+      // 3) เช็ก Supabase Password Login ใหม่
+      const access = await checkSupabaseAccess();
+
+      if (!access.allowed) {
+        if (access.reason === "no_access" || access.reason === "customer_error") {
+          window.location.href = "/no-access.html";
+          return;
+        }
+
+        window.location.href = "/login.html";
+        return;
+      }
+
+      // 4) สร้าง session ให้ระบบเดิมใช้ต่อ
+      const sessionObj = {
+        email: access.email,
+        token: access.token,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        provider: "supabase"
+      };
+
+      setRealCurrentSession(sessionObj);
+
+      // 5) เปิด app ด้วย showApp เดิม เพื่อให้ tracker / usage / autofill ทำงานครบ
+      if (typeof showApp === "function") {
+        showApp();
+      } else {
+        const loginScreen = document.getElementById("loginScreen");
+        const verifyScreen = document.getElementById("verifyScreen");
+        const app = document.getElementById("app");
+        const userInfo = document.getElementById("userInfo");
+
+        if (loginScreen) loginScreen.style.display = "none";
+        if (verifyScreen) verifyScreen.style.display = "none";
+        if (app) app.classList.add("active");
+        if (userInfo) userInfo.textContent = access.email;
+      }
+
+      if (typeof updateAll === "function") {
+        updateAll();
+      }
+
+    } catch (err) {
+      console.error("Password login boot error:", err);
+      window.location.href = "/login.html";
+    }
+  }
+
+  window.logout = async function () {
+    if (!confirm("ออกจากระบบ? (ข้อมูล Tracker ใน browser นี้จะยังอยู่)")) return;
+
+    try {
+      const sb = createAuthClient();
+      if (sb) {
+        await sb.auth.signOut();
+      }
+    } catch (e) {
+      console.error("Supabase logout error:", e);
+    }
+
+    try {
+      if (typeof SESSION_KEY !== "undefined") {
+        localStorage.removeItem(SESSION_KEY);
+      }
+
+      localStorage.removeItem("lego_session");
+    } catch (e) {}
+
+    try {
+      currentSession = null;
+    } catch (e) {}
+
+    window.currentSession = null;
+
+    window.location.href = "/login.html";
+  };
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", bootWithPasswordLoginV2);
+  } else {
+    bootWithPasswordLoginV2();
+  }
+})();
+</script>
 
 <script>
 /*
