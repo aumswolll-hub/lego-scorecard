@@ -1,15 +1,19 @@
 // ════════════════════════════════════════════════
 // /api/usage.js — Freemium + paid monthly scan usage
+// รองรับทั้ง Magic Session เดิม + Supabase Password Login ใหม่
 //
+// Source of truth:
+// customers.plan
+// customers.monthly_scan_limit
+// customers.legacy_unlimited
+//
+// Plans:
 // free = 3 scans/month
 // scanner_paid = 100 scans/month
 // lego_method = 300 scans/month
-// admin = unlimited
-//
-// IMPORTANT:
-// customers.active = login/account status only
-// customers.is_paid = paid Scanner
-// customers.has_method = LEGO METHOD
+// legacy_scanner = unlimited / 999999
+// legacy_method = unlimited / 999999
+// admin = unlimited / 999999
 // ════════════════════════════════════════════════
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -36,76 +40,185 @@ async function sb(path, options = {}) {
   });
 }
 
-async function getEmailFromSession(token) {
+// ───────────────────────────────────────────────
+// AUTH: Magic Session เดิม
+// ───────────────────────────────────────────────
+
+async function getEmailFromMagicSession(token) {
   if (!token) return null;
 
-  const res = await sb(
-    `sessions?session_token=eq.${encodeURIComponent(token)}&select=email,expires_at`
-  );
-
-  if (!res.ok) return null;
-
-  const rows = await res.json();
-
-  if (!rows.length) return null;
-  if (new Date(rows[0].expires_at) < new Date()) return null;
-
-  return rows[0].email;
-}
-
-async function checkCustomerPaid(email) {
   try {
     const res = await sb(
-      `customers?email=eq.${encodeURIComponent(email)}&select=is_paid,has_method,active`
+      `sessions?session_token=eq.${encodeURIComponent(token)}&select=email,expires_at`
     );
 
-    if (!res.ok) return { paid: false, method: false };
+    if (!res.ok) return null;
 
     const rows = await res.json();
 
-    if (!rows.length) return { paid: false, method: false };
+    if (!rows.length) return null;
 
-    const c = rows[0];
+    if (new Date(rows[0].expires_at) < new Date()) return null;
 
-    return {
-      paid: c.is_paid === true,
-      method: c.has_method === true,
-    };
-  } catch {
-    return { paid: false, method: false };
+    return String(rows[0].email).trim().toLowerCase();
+  } catch (err) {
+    console.error("[usage auth] magic session error:", err);
+    return null;
   }
 }
 
-function resolveEntitlement(usage, customerPaid) {
-  const planFromDb = usage.plan || "free";
+// ───────────────────────────────────────────────
+// AUTH: Supabase Password Login ใหม่
+// ───────────────────────────────────────────────
 
-  const isAdmin = usage.is_admin === true || planFromDb === "admin";
+async function getEmailFromSupabaseAccessToken(token) {
+  if (!token) return null;
 
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      method: "GET",
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!res.ok) {
+      const detail = await res.text().catch(() => "");
+      console.warn("[usage auth] Supabase token invalid:", res.status, detail.slice(0, 300));
+      return null;
+    }
+
+    const user = await res.json();
+
+    if (!user || !user.email) return null;
+
+    return String(user.email).trim().toLowerCase();
+  } catch (err) {
+    console.error("[usage auth] Supabase token verify error:", err);
+    return null;
+  }
+}
+
+async function getEmailFromSession(token) {
+  if (!token) return null;
+
+  let email = await getEmailFromMagicSession(token);
+
+  if (!email) {
+    email = await getEmailFromSupabaseAccessToken(token);
+  }
+
+  return email;
+}
+
+function getSessionToken(req) {
+  return (
+    req.headers["x-session-token"] ||
+    (req.body && req.body.sessionToken) ||
+    (req.query && req.query.sessionToken) ||
+    null
+  );
+}
+
+// ───────────────────────────────────────────────
+// CUSTOMER ENTITLEMENT
+// ───────────────────────────────────────────────
+
+async function getCustomer(email) {
+  if (!email) return null;
+
+  try {
+    const res = await sb(
+      `customers?email=eq.${encodeURIComponent(email)}&select=email,active,is_paid,has_method,plan,monthly_scan_limit,legacy_unlimited,deactivated_at`
+    );
+
+    if (!res.ok) {
+      const detail = await res.text().catch(() => "");
+      console.error("[usage] customer query failed:", detail);
+      return null;
+    }
+
+    const rows = await res.json();
+
+    if (!rows.length) return null;
+
+    const c = rows[0];
+
+    if (c.active !== true) return null;
+    if (c.deactivated_at !== null && c.deactivated_at !== undefined) return null;
+
+    return c;
+  } catch (err) {
+    console.error("[usage] customer error:", err);
+    return null;
+  }
+}
+
+function resolveEntitlement(customer) {
+  if (!customer) {
+    return {
+      plan: "free",
+      limit: FREE_LIMIT,
+      isAdmin: false,
+      isStudent: false,
+      isPaid: false,
+      legacyUnlimited: false,
+    };
+  }
+
+  const rawPlan = String(customer.plan || "").trim().toLowerCase();
+
+  const legacyUnlimited = customer.legacy_unlimited === true;
+
+  const hasMethod = customer.has_method === true;
+  const isPaidCustomer = customer.is_paid === true;
+
+  let plan = rawPlan || "free";
+  let limit = Number(customer.monthly_scan_limit || 0);
+
+  // ถ้า limit ใน database ยังไม่ดี ให้ fallback ตาม plan
+  if (!limit || limit < 0) {
+    if (plan === "admin") limit = ADMIN_LIMIT;
+    else if (plan === "legacy_scanner" || plan === "legacy_method") limit = ADMIN_LIMIT;
+    else if (plan === "lego_method") limit = LEGO_METHOD_LIMIT;
+    else if (plan === "scanner_paid") limit = SCANNER_PAID_LIMIT;
+    else if (hasMethod) limit = LEGO_METHOD_LIMIT;
+    else if (isPaidCustomer) limit = SCANNER_PAID_LIMIT;
+    else limit = FREE_LIMIT;
+  }
+
+  // legacy/admin = effectively unlimited
+  if (
+    legacyUnlimited ||
+    plan === "legacy_scanner" ||
+    plan === "legacy_method" ||
+    plan === "admin"
+  ) {
+    limit = ADMIN_LIMIT;
+  }
+
+  // ถ้า plan ยังว่าง แต่ customer flags มีข้อมูล ให้ resolve ให้
+  if (!rawPlan || rawPlan === "empty") {
+    if (hasMethod) plan = "lego_method";
+    else if (isPaidCustomer) plan = "scanner_paid";
+    else plan = "free";
+  }
+
+  const isAdmin = plan === "admin";
   const isStudent =
-    usage.is_lego_method_student === true ||
-    customerPaid.method === true ||
-    planFromDb === "lego_method";
+    plan === "lego_method" ||
+    plan === "legacy_method" ||
+    isAdmin ||
+    hasMethod === true;
 
   const isPaid =
-    usage.is_paid === true ||
-    customerPaid.paid === true ||
-    planFromDb === "scanner_paid" ||
+    isAdmin ||
     isStudent ||
-    isAdmin;
-
-  let plan = "free";
-  let limit = FREE_LIMIT;
-
-  if (isAdmin) {
-    plan = "admin";
-    limit = ADMIN_LIMIT;
-  } else if (isStudent) {
-    plan = "lego_method";
-    limit = LEGO_METHOD_LIMIT;
-  } else if (isPaid) {
-    plan = "scanner_paid";
-    limit = SCANNER_PAID_LIMIT;
-  }
+    plan === "scanner_paid" ||
+    plan === "legacy_scanner" ||
+    isPaidCustomer === true;
 
   return {
     plan,
@@ -113,10 +226,19 @@ function resolveEntitlement(usage, customerPaid) {
     isAdmin,
     isStudent,
     isPaid,
+    legacyUnlimited:
+      legacyUnlimited ||
+      plan === "legacy_scanner" ||
+      plan === "legacy_method" ||
+      plan === "admin",
   };
 }
 
-async function getOrCreateUsage(email) {
+// ───────────────────────────────────────────────
+// USAGE TABLE
+// ───────────────────────────────────────────────
+
+async function getOrCreateUsage(email, entitlement) {
   const res = await sb(
     `scanner_user_usage?email=eq.${encodeURIComponent(email)}&select=*`
   );
@@ -128,20 +250,25 @@ async function getOrCreateUsage(email) {
 
   const month = currentMonth();
 
+  const insertPayload = {
+    email,
+    scans_used: 0,
+    usage_month: month,
+    free_scan_limit: entitlement.limit,
+    monthly_scan_limit: entitlement.limit,
+    is_paid: entitlement.isPaid,
+    is_lego_method_student: entitlement.isStudent,
+    is_admin: entitlement.isAdmin,
+    plan: entitlement.plan,
+    updated_at: new Date().toISOString(),
+  };
+
   const ins = await sb("scanner_user_usage", {
     method: "POST",
-    headers: { Prefer: "return=representation" },
-    body: JSON.stringify({
-      email,
-      scans_used: 0,
-      usage_month: month,
-      free_scan_limit: FREE_LIMIT,
-      monthly_scan_limit: FREE_LIMIT,
-      is_paid: false,
-      is_lego_method_student: false,
-      is_admin: false,
-      plan: "free",
-    }),
+    headers: {
+      Prefer: "return=representation",
+    },
+    body: JSON.stringify(insertPayload),
   });
 
   if (ins.ok) {
@@ -149,17 +276,7 @@ async function getOrCreateUsage(email) {
     if (rows.length) return rows[0];
   }
 
-  return {
-    email,
-    scans_used: 0,
-    usage_month: month,
-    free_scan_limit: FREE_LIMIT,
-    monthly_scan_limit: FREE_LIMIT,
-    is_paid: false,
-    is_lego_method_student: false,
-    is_admin: false,
-    plan: "free",
-  };
+  return insertPayload;
 }
 
 async function resetMonthIfNeeded(usage) {
@@ -175,7 +292,9 @@ async function resetMonthIfNeeded(usage) {
 
   await sb(`scanner_user_usage?email=eq.${encodeURIComponent(usage.email)}`, {
     method: "PATCH",
-    headers: { Prefer: "return=minimal" },
+    headers: {
+      Prefer: "return=minimal",
+    },
     body: JSON.stringify(patch),
   });
 
@@ -185,7 +304,7 @@ async function resetMonthIfNeeded(usage) {
   };
 }
 
-async function syncEntitlement(usage, entitlement) {
+async function syncUsageEntitlement(usage, entitlement) {
   const desired = {
     plan: entitlement.plan,
     is_paid: entitlement.isPaid,
@@ -200,8 +319,8 @@ async function syncEntitlement(usage, entitlement) {
     usage.is_paid !== desired.is_paid ||
     usage.is_lego_method_student !== desired.is_lego_method_student ||
     usage.is_admin !== desired.is_admin ||
-    Number(usage.monthly_scan_limit || 0) !== desired.monthly_scan_limit ||
-    Number(usage.free_scan_limit || 0) !== desired.free_scan_limit;
+    Number(usage.monthly_scan_limit || 0) !== Number(desired.monthly_scan_limit || 0) ||
+    Number(usage.free_scan_limit || 0) !== Number(desired.free_scan_limit || 0);
 
   if (!needsPatch) return usage;
 
@@ -212,7 +331,9 @@ async function syncEntitlement(usage, entitlement) {
 
   await sb(`scanner_user_usage?email=eq.${encodeURIComponent(usage.email)}`, {
     method: "PATCH",
-    headers: { Prefer: "return=minimal" },
+    headers: {
+      Prefer: "return=minimal",
+    },
     body: JSON.stringify(patch),
   });
 
@@ -222,33 +343,57 @@ async function syncEntitlement(usage, entitlement) {
   };
 }
 
+// ───────────────────────────────────────────────
+// STATE
+// ───────────────────────────────────────────────
+
 function computeState(usage, entitlement) {
   const used = Number(usage.scans_used || 0);
-  const limit = entitlement.limit;
+  const limit = Number(entitlement.limit || FREE_LIMIT);
   const scansLeft = Math.max(0, limit - used);
 
   let state = "logged_in_free";
 
-  if (entitlement.isAdmin) state = "admin";
-  else if (entitlement.isStudent) state = "lego_method_student";
-  else if (entitlement.isPaid) state = "paid_scanner";
-  else if (used >= limit) state = "free_limit_reached";
+  if (entitlement.isAdmin) {
+    state = "admin";
+  } else if (entitlement.legacyUnlimited) {
+    state = entitlement.plan === "legacy_method" ? "legacy_method" : "legacy_scanner";
+  } else if (entitlement.isStudent) {
+    state = "lego_method_student";
+  } else if (entitlement.isPaid) {
+    state = "paid_scanner";
+  } else if (used >= limit) {
+    state = "free_limit_reached";
+  }
+
+  const canScan =
+    entitlement.isAdmin ||
+    entitlement.legacyUnlimited ||
+    used < limit;
 
   return {
     email: usage.email,
     usage_month: usage.usage_month || currentMonth(),
+
     scans_used: used,
     monthly_scan_limit: limit,
     free_scan_limit: limit,
     scans_left: scansLeft,
+
     is_paid: entitlement.isPaid,
     is_lego_method_student: entitlement.isStudent,
     is_admin: entitlement.isAdmin,
+    legacy_unlimited: entitlement.legacyUnlimited,
+
     plan: entitlement.plan,
     state,
-    can_scan: entitlement.isAdmin || used < limit,
+    can_scan: canScan,
   };
 }
+
+// ───────────────────────────────────────────────
+// HANDLER
+// ───────────────────────────────────────────────
 
 export default async function handler(req, res) {
   res.setHeader("Content-Type", "application/json");
@@ -261,10 +406,14 @@ export default async function handler(req, res) {
       });
     }
 
-    const sessionToken =
-      req.headers["x-session-token"] ||
-      (req.body && req.body.sessionToken) ||
-      (req.query && req.query.sessionToken);
+    const body =
+      typeof req.body === "string"
+        ? JSON.parse(req.body || "{}")
+        : req.body || {};
+
+    req.body = body;
+
+    const sessionToken = getSessionToken(req);
 
     const email = await getEmailFromSession(sessionToken);
 
@@ -275,13 +424,20 @@ export default async function handler(req, res) {
       });
     }
 
-    let usage = await getOrCreateUsage(email);
+    const customer = await getCustomer(email);
+
+    if (!customer) {
+      return res.status(403).json({
+        error: "no_access",
+        message: "ไม่พบสิทธิ์ใช้งาน",
+      });
+    }
+
+    const entitlement = resolveEntitlement(customer);
+
+    let usage = await getOrCreateUsage(email, entitlement);
     usage = await resetMonthIfNeeded(usage);
-
-    const customerPaid = await checkCustomerPaid(email);
-    const entitlement = resolveEntitlement(usage, customerPaid);
-
-    usage = await syncEntitlement(usage, entitlement);
+    usage = await syncUsageEntitlement(usage, entitlement);
 
     if (req.method === "GET") {
       return res.status(200).json(computeState(usage, entitlement));
@@ -298,7 +454,8 @@ export default async function handler(req, res) {
         });
       }
 
-      if (state.is_admin) {
+      // admin/legacy ไม่ต้องนับแบบ block แต่ยังคืน state ให้ frontend
+      if (state.is_admin || state.legacy_unlimited) {
         return res.status(200).json({
           ...state,
           counted: false,
@@ -310,7 +467,9 @@ export default async function handler(req, res) {
 
       await sb(`scanner_user_usage?email=eq.${encodeURIComponent(email)}`, {
         method: "PATCH",
-        headers: { Prefer: "return=minimal" },
+        headers: {
+          Prefer: "return=minimal",
+        },
         body: JSON.stringify({
           scans_used: newCount,
           updated_at: new Date().toISOString(),
