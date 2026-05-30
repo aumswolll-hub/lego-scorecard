@@ -1,8 +1,12 @@
-// /api/auth.js — Request magic link (FREEMIUM: ใครก็ login ได้)
-// POST { email } → ส่ง magic link ทุก email (ไม่ต้องซื้อก่อน)
+// /api/auth.js — Request magic link (FREEMIUM)
+// POST { email } → ส่ง magic link ทุก email
 //
 // ใครก็ขอ link ได้ → track สิทธิ์ที่ usage.js แทน
-// IMPORTANT: magic link ต้องใช้ production domain จริงเท่านั้น
+// IMPORTANT:
+// - ใช้ production domain จริงเท่านั้น
+// - link อยู่ได้ 60 นาที
+// - ถ้าขอ link ใหม่ token เก่าจะใช้ไม่ได้
+// - subject มีเวลาไทย เพื่อให้ลูกค้ารู้ว่า email ไหนล่าสุด
 
 import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
@@ -44,7 +48,7 @@ export default async function handler(req, res) {
     const normalizedEmail = email.trim().toLowerCase();
 
     // 1. Invalidate old unused tokens for this email
-    // กันลูกค้ากดลิงก์เก่าใน Gmail แล้วเข้าไม่ได้
+    // กันลูกค้ากดลิงก์เก่าใน Gmail แล้วเจอ 410
     const { error: invalidateErr } = await supabase
       .from('magic_tokens')
       .update({
@@ -66,7 +70,7 @@ export default async function handler(req, res) {
     // 2. Generate new magic link token
     const token = crypto.randomBytes(32).toString('hex');
 
-    // เปลี่ยนจาก 15 นาที → 60 นาที
+    // 60 minutes
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
 
     // 3. Store token
@@ -92,25 +96,34 @@ export default async function handler(req, res) {
     const appUrl = getAppUrl();
 
     // คง path เดิมไว้ก่อน เพื่อไม่ให้ frontend พัง
-    // ถ้าคุณมีหน้า /auth/callback แล้ว ค่อยเปลี่ยนเป็น:
+    // ถ้ามีหน้า /auth/callback แล้ว ค่อยเปลี่ยนเป็น:
     // const magicLink = `${appUrl}/auth/callback?token=${token}`;
     const magicLink = `${appUrl}/?token=${token}`;
+
+    const thaiTime = new Date().toLocaleString('th-TH', {
+      timeZone: 'Asia/Bangkok',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
 
     console.log('[auth] magic link generated:', {
       email: normalizedEmail,
       appUrl,
       host: req.headers.host,
-      expiresAt: expiresAt.toISOString()
+      expiresAt: expiresAt.toISOString(),
+      thaiTime
     });
 
     // 5. Send email via Resend
     const { error: sendErr } = await resend.emails.send({
       from: process.env.EMAIL_FROM || 'LEGO Scanner <noreply@legoscanner.me>',
       to: normalizedEmail,
-      subject: 'เข้าสู่ระบบ LEGO Scanner',
+      subject: `เข้าสู่ระบบ LEGO Scanner — ลิงก์ล่าสุด ${thaiTime}`,
       html: `
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px; color: #0F0F0F;">
-          <div style="background: #0F0F0F; color: #F5EFE6; padding: 8px 14px; display: inline-block; font-weight: 700; font-size: 11px; letter-spacing: 0.15em; margin-bottom: 24px;">LEGO SCANNER</div>
+          <div style="background: #0F0F0F; color: #F5EFE6; padding: 8px 14px; display: inline-block; font-weight: 700; font-size: 11px; letter-spacing: 0.15em; margin-bottom: 24px;">
+            LEGO SCANNER
+          </div>
 
           <h1 style="font-size: 32px; line-height: 1.1; margin: 0 0 16px; letter-spacing: -0.02em;">
             เข้าสู่ระบบ<br>
