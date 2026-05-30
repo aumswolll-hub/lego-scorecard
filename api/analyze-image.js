@@ -1,5 +1,6 @@
 // ════════════════════════════════════════════════
 // /api/analyze-image.js — อ่านภาพ TikTok Promotion info → คืนตัวเลข
+// รองรับทั้ง Magic Session เดิม + Supabase Password Login ใหม่
 // Conservative mode: ไม่มั่นใจ = null ไม่เดา
 // ════════════════════════════════════════════════
 
@@ -28,7 +29,45 @@ async function sb(path, options = {}) {
   });
 }
 
-async function getEmailFromSession(token) {
+/*
+  Verify Supabase Auth access token.
+  ใช้ตอน user login แบบ email/password ใหม่
+*/
+async function getEmailFromSupabaseAccessToken(token) {
+  if (!token) return null;
+
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      method: "GET",
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!res.ok) {
+      const detail = await res.text().catch(() => "");
+      console.warn("[auth] Supabase token invalid:", res.status, detail.slice(0, 300));
+      return null;
+    }
+
+    const user = await res.json();
+
+    if (!user || !user.email) return null;
+
+    return String(user.email).trim().toLowerCase();
+  } catch (err) {
+    console.error("[auth] Supabase token verify error:", err);
+    return null;
+  }
+}
+
+/*
+  Verify magic session token เดิม
+  ใช้ตอน user login แบบ magic link เดิม
+*/
+async function getEmailFromMagicSession(token) {
   if (!token) return null;
 
   const res = await sb(
@@ -38,11 +77,65 @@ async function getEmailFromSession(token) {
   if (!res.ok) return null;
 
   const rows = await res.json();
+
   if (!rows.length) return null;
 
   if (new Date(rows[0].expires_at) < new Date()) return null;
 
-  return rows[0].email;
+  return String(rows[0].email).trim().toLowerCase();
+}
+
+/*
+  เช็กว่า email นี้อยู่ใน customers และ active จริงไหม
+*/
+async function customerHasAccess(email) {
+  if (!email) return false;
+
+  try {
+    const res = await sb(
+      `customers?email=eq.${encodeURIComponent(email)}&active=eq.true&deactivated_at=is.null&select=email,active,deactivated_at`
+    );
+
+    if (!res.ok) {
+      const detail = await res.text().catch(() => "");
+      console.error("[auth] customer access query failed:", detail);
+      return false;
+    }
+
+    const rows = await res.json();
+
+    return rows.length > 0;
+  } catch (err) {
+    console.error("[auth] customer access error:", err);
+    return false;
+  }
+}
+
+/*
+  Main auth resolver:
+  1. ลอง magic session เดิมก่อน
+  2. ถ้าไม่เจอ ลอง Supabase access_token ใหม่
+  3. ต้องผ่าน customers.active ด้วย
+*/
+async function getEmailFromSession(token) {
+  if (!token) return null;
+
+  let email = await getEmailFromMagicSession(token);
+
+  if (!email) {
+    email = await getEmailFromSupabaseAccessToken(token);
+  }
+
+  if (!email) return null;
+
+  const allowed = await customerHasAccess(email);
+
+  if (!allowed) {
+    console.warn("[auth] email found but no customer access:", email);
+    return null;
+  }
+
+  return email;
 }
 
 async function hasMethodAccess(email) {
@@ -54,6 +147,7 @@ async function hasMethodAccess(email) {
     if (!res.ok) return false;
 
     const rows = await res.json();
+
     return rows.length > 0 && rows[0].has_method === true;
   } catch {
     return false;
@@ -214,14 +308,18 @@ function normalizeParsed(parsed) {
     if (confidence === "low" || isUncertain) {
       out[field] = null;
 
-      if (!out.uncertain_fields.includes(field)) out.uncertain_fields.push(field);
+      if (!out.uncertain_fields.includes(field)) {
+        out.uncertain_fields.push(field);
+      }
 
       out.needs_manual_review = true;
     } else {
       out[field] = numericValue;
 
       if (numericValue === null) {
-        if (!out.uncertain_fields.includes(field)) out.uncertain_fields.push(field);
+        if (!out.uncertain_fields.includes(field)) {
+          out.uncertain_fields.push(field);
+        }
 
         out.needs_manual_review = true;
       }
@@ -371,7 +469,7 @@ export default async function handler(req, res) {
     if (!email) {
       return res.status(401).json({
         error: "unauthorized",
-        message: "Session หมดอายุ — login ใหม่",
+        message: "Session หมดอายุ — logout แล้ว login ใหม่",
       });
     }
 
