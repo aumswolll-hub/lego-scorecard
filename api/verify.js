@@ -6,6 +6,10 @@
 // 2. Create session first
 // 3. Ensure usage row exists
 // 4. Mark magic token as used only after session is created successfully
+//
+// สำคัญ:
+// - ห้าม mark token used ก่อนสร้าง session สำเร็จ
+// - เพิ่ม log reason เพื่อ debug 410 ได้ชัด
 
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
@@ -24,7 +28,10 @@ export default async function handler(req, res) {
     const { token } = req.query;
 
     if (!token) {
-      console.log('[verify failed]', { reason: 'token_missing' });
+      console.log('[verify failed]', {
+        reason: 'token_missing'
+      });
+
       return res.status(400).json({ error: 'Token required' });
     }
 
@@ -42,7 +49,9 @@ export default async function handler(req, res) {
         supabaseError: error?.message || null
       });
 
-      return res.status(404).json({ error: 'ลิงก์ไม่ถูกต้อง กรุณาขอลิงก์ใหม่' });
+      return res.status(404).json({
+        error: 'ลิงก์ไม่ถูกต้อง กรุณาขอลิงก์ใหม่'
+      });
     }
 
     // 2. Check expiration
@@ -57,7 +66,9 @@ export default async function handler(req, res) {
         now: now.toISOString()
       });
 
-      return res.status(410).json({ error: 'ลิงก์หมดอายุ — กรุณาขอใหม่' });
+      return res.status(410).json({
+        error: 'ลิงก์หมดอายุ — กรุณาขอใหม่'
+      });
     }
 
     // 3. Check already used
@@ -68,19 +79,23 @@ export default async function handler(req, res) {
         usedAt: row.used_at || null
       });
 
-      return res.status(410).json({ error: 'ลิงก์ถูกใช้ไปแล้ว — กรุณาขอใหม่' });
+      return res.status(410).json({
+        error: 'ลิงก์ถูกใช้ไปแล้ว — กรุณาขอใหม่'
+      });
     }
 
-    // 4. Generate session token first
+    // 4. Generate session token
     const sessionToken = crypto.randomBytes(32).toString('hex');
     const sessionExpires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
-    // 5. Insert session and CHECK error
-    const { error: sessionErr } = await supabase.from('sessions').insert({
-      session_token: sessionToken,
-      email: row.email,
-      expires_at: sessionExpires.toISOString()
-    });
+    // 5. Insert session first
+    const { error: sessionErr } = await supabase
+      .from('sessions')
+      .insert({
+        session_token: sessionToken,
+        email: row.email,
+        expires_at: sessionExpires.toISOString()
+      });
 
     if (sessionErr) {
       console.error('[verify failed]', {
@@ -89,10 +104,12 @@ export default async function handler(req, res) {
         error: sessionErr.message
       });
 
-      return res.status(500).json({ error: 'สร้าง session ไม่สำเร็จ กรุณาลองใหม่' });
+      return res.status(500).json({
+        error: 'สร้าง session ไม่สำเร็จ กรุณาลองใหม่'
+      });
     }
 
-    // 6. Ensure usage row exists and CHECK error
+    // 6. Ensure usage row exists
     const { error: usageErr } = await supabase
       .from('scanner_user_usage')
       .upsert(
@@ -116,7 +133,9 @@ export default async function handler(req, res) {
         error: usageErr.message
       });
 
-      return res.status(500).json({ error: 'เตรียมสิทธิ์ใช้งานไม่สำเร็จ กรุณาลองใหม่' });
+      return res.status(500).json({
+        error: 'เตรียมสิทธิ์ใช้งานไม่สำเร็จ กรุณาลองใหม่'
+      });
     }
 
     // 7. Mark token as used only AFTER session + usage succeeded
@@ -154,7 +173,10 @@ export default async function handler(req, res) {
       expiresAt: sessionExpires.toISOString()
     });
   } catch (err) {
-    console.error('Verify error:', err);
-    return res.status(500).json({ error: 'เกิดข้อผิดพลาด' });
+    console.error('[verify error]', err);
+
+    return res.status(500).json({
+      error: 'เกิดข้อผิดพลาด'
+    });
   }
 }
