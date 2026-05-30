@@ -1,9 +1,8 @@
 // /api/auth.js — Request magic link (FREEMIUM: ใครก็ login ได้)
 // POST { email } → ส่ง magic link ทุก email (ไม่ต้องซื้อก่อน)
 //
-// ตอนนี้: ใครก็ขอ link ได้ → track สิทธิ์ที่ usage.js แทน
+// ใครก็ขอ link ได้ → track สิทธิ์ที่ usage.js แทน
 // IMPORTANT: magic link ต้องใช้ production domain จริงเท่านั้น
-// เพื่อไม่ให้ user กดจาก email แล้วกลับไปโดน domain เก่า / session คนละ domain
 
 import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
@@ -16,8 +15,6 @@ const supabase = createClient(
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-// Hard fallback เป็น domain จริงของ product
-// ห้าม fallback ไป req.headers.host เพราะอาจกลายเป็น lego-scorecard.vercel.app
 const DEFAULT_APP_URL = 'https://legoscanner.app';
 
 function getAppUrl() {
@@ -25,10 +22,9 @@ function getAppUrl() {
 
   return raw
     .trim()
-    .replace(/\/+$/, ''); // ตัด / ท้าย url กัน link เป็น //?token
+    .replace(/\/+$/, '');
 }
 
-// validate email format
 function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
@@ -47,13 +43,33 @@ export default async function handler(req, res) {
 
     const normalizedEmail = email.trim().toLowerCase();
 
-    // ── FREEMIUM: ไม่เช็คว่าซื้อรึยัง — ใครก็ login ได้ ──
+    // 1. Invalidate old unused tokens for this email
+    // กันลูกค้ากดลิงก์เก่าใน Gmail แล้วเข้าไม่ได้
+    const { error: invalidateErr } = await supabase
+      .from('magic_tokens')
+      .update({
+        used: true,
+        used_at: new Date().toISOString()
+      })
+      .eq('email', normalizedEmail)
+      .eq('used', false);
 
-    // 1. Generate magic link token
+    if (invalidateErr) {
+      console.error('[auth] old token invalidate error:', {
+        email: normalizedEmail,
+        error: invalidateErr.message
+      });
+
+      return res.status(500).json({ error: 'เกิดข้อผิดพลาด' });
+    }
+
+    // 2. Generate new magic link token
     const token = crypto.randomBytes(32).toString('hex');
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 min
 
-    // 2. Store token
+    // เปลี่ยนจาก 15 นาที → 60 นาที
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
+    // 3. Store token
     const { error: tokenErr } = await supabase
       .from('magic_tokens')
       .insert({
@@ -64,21 +80,30 @@ export default async function handler(req, res) {
       });
 
     if (tokenErr) {
-      console.error('Token insert error:', tokenErr);
+      console.error('[auth] token insert error:', {
+        email: normalizedEmail,
+        error: tokenErr.message
+      });
+
       return res.status(500).json({ error: 'เกิดข้อผิดพลาด' });
     }
 
-    // 3. Build magic link
+    // 4. Build magic link
     const appUrl = getAppUrl();
+
+    // คง path เดิมไว้ก่อน เพื่อไม่ให้ frontend พัง
+    // ถ้าคุณมีหน้า /auth/callback แล้ว ค่อยเปลี่ยนเป็น:
+    // const magicLink = `${appUrl}/auth/callback?token=${token}`;
     const magicLink = `${appUrl}/?token=${token}`;
 
     console.log('[auth] magic link generated:', {
       email: normalizedEmail,
       appUrl,
-      host: req.headers.host
+      host: req.headers.host,
+      expiresAt: expiresAt.toISOString()
     });
 
-    // 4. Send email via Resend
+    // 5. Send email via Resend
     const { error: sendErr } = await resend.emails.send({
       from: process.env.EMAIL_FROM || 'LEGO Scanner <noreply@legoscanner.me>',
       to: normalizedEmail,
@@ -94,7 +119,8 @@ export default async function handler(req, res) {
 
           <p style="color: #6B6B6B; font-size: 14px; line-height: 1.6; margin-bottom: 32px;">
             คลิกปุ่มด้านล่างเพื่อเข้าสู่ระบบ LEGO Scanner<br>
-            ลิงก์นี้ใช้ได้ภายใน <strong>15 นาที</strong> และใช้ได้ <strong>ครั้งเดียว</strong>
+            ลิงก์นี้ใช้ได้ภายใน <strong>60 นาที</strong> และใช้ได้ <strong>ครั้งเดียว</strong><br>
+            ถ้าขอลิงก์หลายครั้ง กรุณากดจากอีเมลล่าสุดเท่านั้น
           </p>
 
           <a href="${magicLink}" style="display: inline-block; background: #C8312B; color: #F5EFE6; padding: 14px 32px; text-decoration: none; font-weight: 600; font-size: 14px; letter-spacing: 0.1em; text-transform: uppercase;">
@@ -114,13 +140,17 @@ export default async function handler(req, res) {
     });
 
     if (sendErr) {
-      console.error('Email send error:', sendErr);
+      console.error('[auth] email send error:', {
+        email: normalizedEmail,
+        error: sendErr.message
+      });
+
       return res.status(500).json({ error: 'ส่งอีเมลไม่สำเร็จ' });
     }
 
     return res.status(200).json({ success: true });
   } catch (err) {
-    console.error('Auth error:', err);
+    console.error('[auth] error:', err);
     return res.status(500).json({ error: 'เกิดข้อผิดพลาดในระบบ' });
   }
 }
