@@ -17,6 +17,8 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      padding: 20px;
+      box-sizing: border-box;
     }
 
     .card {
@@ -57,6 +59,11 @@
       color: white;
       box-sizing: border-box;
       font-size: 15px;
+      outline: none;
+    }
+
+    input:focus {
+      border-color: #ffffff;
     }
 
     button {
@@ -70,6 +77,10 @@
       font-weight: 700;
       cursor: pointer;
       font-size: 15px;
+    }
+
+    button:hover {
+      opacity: 0.9;
     }
 
     button.secondary {
@@ -90,10 +101,15 @@
       font-size: 14px;
       color: #facc15;
       line-height: 1.5;
+      min-height: 20px;
     }
 
     .danger {
       color: #f87171;
+    }
+
+    .success {
+      color: #4ade80;
     }
 
     .small {
@@ -113,14 +129,24 @@
     </p>
 
     <label for="email">อีเมล</label>
-    <input id="email" type="email" placeholder="your@email.com" autocomplete="email" />
+    <input
+      id="email"
+      type="email"
+      placeholder="your@email.com"
+      autocomplete="email"
+    />
 
     <label for="password">รหัสผ่าน</label>
-    <input id="password" type="password" placeholder="อย่างน้อย 6 ตัวอักษร" autocomplete="current-password" />
+    <input
+      id="password"
+      type="password"
+      placeholder="อย่างน้อย 6 ตัวอักษร"
+      autocomplete="current-password"
+    />
 
-    <button onclick="login()">เข้าสู่ระบบ</button>
-    <button class="secondary" onclick="signup()">สร้างบัญชีด้วยอีเมลที่ใช้ชำระเงิน</button>
-    <button class="link" onclick="resetPassword()">ลืมรหัสผ่าน / ตั้งรหัสผ่านใหม่</button>
+    <button id="loginBtn" type="button">เข้าสู่ระบบ</button>
+    <button id="signupBtn" type="button" class="secondary">สร้างบัญชีด้วยอีเมลที่ใช้ชำระเงิน</button>
+    <button id="resetBtn" type="button" class="link">ลืมรหัสผ่าน / ตั้งรหัสผ่านใหม่</button>
 
     <div id="message" class="message"></div>
 
@@ -133,7 +159,22 @@
     const SUPABASE_URL = 'https://kdfyfnolxhcxswbotolq.supabase.co';
     const SUPABASE_ANON_KEY = 'sb_publishable_RxZbbxePB1RakFMi-h7LIQ_EVv0AS9_';
 
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    let sb;
+
+    function showMessage(text, type = 'normal') {
+      const el = document.getElementById('message');
+      if (!el) return;
+
+      el.textContent = text;
+
+      if (type === 'error') {
+        el.className = 'message danger';
+      } else if (type === 'success') {
+        el.className = 'message success';
+      } else {
+        el.className = 'message';
+      }
+    }
 
     function getEmail() {
       return document.getElementById('email').value.trim().toLowerCase();
@@ -143,16 +184,36 @@
       return document.getElementById('password').value;
     }
 
-    function showMessage(text, isError = false) {
-      const el = document.getElementById('message');
-      el.textContent = text;
-      el.className = isError ? 'message danger' : 'message';
+    function setButtonsDisabled(disabled) {
+      document.getElementById('loginBtn').disabled = disabled;
+      document.getElementById('signupBtn').disabled = disabled;
+      document.getElementById('resetBtn').disabled = disabled;
+    }
+
+    function initSupabase() {
+      if (!window.supabase) {
+        showMessage('โหลดระบบเข้าสู่ระบบไม่สำเร็จ กรุณารีเฟรชหน้าอีกครั้ง', 'error');
+        return false;
+      }
+
+      try {
+        sb = window.supabase.createClient(
+          SUPABASE_URL,
+          SUPABASE_ANON_KEY
+        );
+
+        return true;
+      } catch (err) {
+        console.error('Supabase init error:', err);
+        showMessage('ระบบเข้าสู่ระบบมีปัญหา กรุณารีเฟรชหน้าอีกครั้ง', 'error');
+        return false;
+      }
     }
 
     async function checkCustomerAccess() {
-      const { data: userData, error: userError } = await supabase.auth.getUser();
+      const { data: userData, error: userError } = await sb.auth.getUser();
 
-      if (userError || !userData.user) {
+      if (userError || !userData || !userData.user) {
         return {
           allowed: false,
           reason: 'not_logged_in'
@@ -161,7 +222,7 @@
 
       const email = userData.user.email.trim().toLowerCase();
 
-      const { data: customer, error } = await supabase
+      const { data: customer, error } = await sb
         .from('customers')
         .select('*')
         .eq('email', email)
@@ -170,10 +231,11 @@
         .maybeSingle();
 
       if (error) {
-        console.error(error);
+        console.error('Customer access error:', error);
         return {
           allowed: false,
-          reason: 'database_error'
+          reason: 'database_error',
+          error
         };
       }
 
@@ -194,7 +256,17 @@
       const access = await checkCustomerAccess();
 
       if (access.allowed) {
-        window.location.href = '/';
+        showMessage('เข้าสู่ระบบสำเร็จ กำลังพาไปหน้าใช้งาน...', 'success');
+
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 500);
+
+        return;
+      }
+
+      if (access.reason === 'database_error') {
+        showMessage('ระบบตรวจสิทธิ์มีปัญหา กรุณาลองใหม่อีกครั้ง', 'error');
         return;
       }
 
@@ -206,23 +278,32 @@
       const password = getPassword();
 
       if (!email || !password) {
-        showMessage('กรุณากรอกอีเมลและรหัสผ่าน', true);
+        showMessage('กรุณากรอกอีเมลและรหัสผ่าน', 'error');
         return;
       }
 
+      setButtonsDisabled(true);
       showMessage('กำลังเข้าสู่ระบบ...');
 
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
+      try {
+        const { error } = await sb.auth.signInWithPassword({
+          email,
+          password
+        });
 
-      if (error) {
-        showMessage('อีเมลหรือรหัสผ่านไม่ถูกต้อง', true);
-        return;
+        if (error) {
+          console.error('Login error:', error);
+          showMessage('อีเมลหรือรหัสผ่านไม่ถูกต้อง', 'error');
+          return;
+        }
+
+        await goAfterAuth();
+      } catch (err) {
+        console.error('Login unexpected error:', err);
+        showMessage('เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่อีกครั้ง', 'error');
+      } finally {
+        setButtonsDisabled(false);
       }
-
-      await goAfterAuth();
     }
 
     async function signup() {
@@ -230,56 +311,91 @@
       const password = getPassword();
 
       if (!email || !password) {
-        showMessage('กรุณากรอกอีเมลและรหัสผ่าน', true);
+        showMessage('กรุณากรอกอีเมลและรหัสผ่าน', 'error');
         return;
       }
 
       if (password.length < 6) {
-        showMessage('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร', true);
+        showMessage('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร', 'error');
         return;
       }
 
+      setButtonsDisabled(true);
       showMessage('กำลังสร้างบัญชี...');
 
-      const { error } = await supabase.auth.signUp({
-        email,
-        password
-      });
+      try {
+        const { error } = await sb.auth.signUp({
+          email,
+          password
+        });
 
-      if (error) {
-        if (error.message && error.message.toLowerCase().includes('already registered')) {
-          showMessage('อีเมลนี้มีบัญชีแล้ว กรุณากดเข้าสู่ระบบหรือลืมรหัสผ่าน', true);
+        if (error) {
+          console.error('Signup error:', error);
+
+          const msg = error.message || '';
+
+          if (
+            msg.toLowerCase().includes('already') ||
+            msg.toLowerCase().includes('registered') ||
+            msg.toLowerCase().includes('exists')
+          ) {
+            showMessage('อีเมลนี้มีบัญชีแล้ว กรุณากดเข้าสู่ระบบหรือลืมรหัสผ่าน', 'error');
+            return;
+          }
+
+          showMessage(msg || 'สร้างบัญชีไม่สำเร็จ', 'error');
           return;
         }
 
-        showMessage(error.message || 'สร้างบัญชีไม่สำเร็จ', true);
-        return;
+        await goAfterAuth();
+      } catch (err) {
+        console.error('Signup unexpected error:', err);
+        showMessage('สร้างบัญชีไม่สำเร็จ กรุณาลองใหม่อีกครั้ง', 'error');
+      } finally {
+        setButtonsDisabled(false);
       }
-
-      await goAfterAuth();
     }
 
     async function resetPassword() {
       const email = getEmail();
 
       if (!email) {
-        showMessage('กรุณากรอกอีเมลก่อนกดตั้งรหัสผ่านใหม่', true);
+        showMessage('กรุณากรอกอีเมลก่อนกดตั้งรหัสผ่านใหม่', 'error');
         return;
       }
 
+      setButtonsDisabled(true);
       showMessage('กำลังส่งลิงก์ตั้งรหัสผ่าน...');
 
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: 'https://legoscanner.app/reset-password.html'
-      });
+      try {
+        const { error } = await sb.auth.resetPasswordForEmail(email, {
+          redirectTo: 'https://legoscanner.app/reset-password.html'
+        });
 
-      if (error) {
-        showMessage('ส่งลิงก์ตั้งรหัสผ่านไม่สำเร็จ', true);
-        return;
+        if (error) {
+          console.error('Reset password error:', error);
+          showMessage('ส่งลิงก์ตั้งรหัสผ่านไม่สำเร็จ', 'error');
+          return;
+        }
+
+        showMessage('ส่งลิงก์ตั้งรหัสผ่านไปที่อีเมลแล้ว กรุณาเช็กกล่องจดหมาย', 'success');
+      } catch (err) {
+        console.error('Reset password unexpected error:', err);
+        showMessage('ส่งลิงก์ตั้งรหัสผ่านไม่สำเร็จ กรุณาลองใหม่อีกครั้ง', 'error');
+      } finally {
+        setButtonsDisabled(false);
       }
-
-      showMessage('ส่งลิงก์ตั้งรหัสผ่านไปที่อีเมลแล้ว กรุณาเช็กกล่องจดหมาย');
     }
+
+    document.addEventListener('DOMContentLoaded', function () {
+      const ok = initSupabase();
+
+      if (!ok) return;
+
+      document.getElementById('loginBtn').addEventListener('click', login);
+      document.getElementById('signupBtn').addEventListener('click', signup);
+      document.getElementById('resetBtn').addEventListener('click', resetPassword);
+    });
   </script>
 </body>
 </html>
