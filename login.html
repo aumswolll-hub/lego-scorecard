@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>เข้าสู่ระบบ | LEGO SCANNER</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #0f0f0f;
+      color: #ffffff;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .card {
+      width: 100%;
+      max-width: 420px;
+      background: #171717;
+      border: 1px solid #2a2a2a;
+      border-radius: 18px;
+      padding: 28px;
+      box-sizing: border-box;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 28px;
+    }
+
+    p {
+      color: #b5b5b5;
+      line-height: 1.6;
+      font-size: 14px;
+    }
+
+    label {
+      display: block;
+      margin-top: 16px;
+      margin-bottom: 6px;
+      font-size: 14px;
+      color: #e5e5e5;
+    }
+
+    input {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 10px;
+      border: 1px solid #333;
+      background: #0b0b0b;
+      color: white;
+      box-sizing: border-box;
+      font-size: 15px;
+    }
+
+    button {
+      width: 100%;
+      margin-top: 14px;
+      padding: 13px 16px;
+      border: 0;
+      border-radius: 10px;
+      background: #ffffff;
+      color: #000000;
+      font-weight: 700;
+      cursor: pointer;
+      font-size: 15px;
+    }
+
+    button.secondary {
+      background: #262626;
+      color: #ffffff;
+    }
+
+    button.link {
+      background: transparent;
+      color: #b5b5b5;
+      text-decoration: underline;
+      font-weight: 400;
+      padding: 8px;
+    }
+
+    .message {
+      margin-top: 14px;
+      font-size: 14px;
+      color: #facc15;
+      line-height: 1.5;
+    }
+
+    .danger {
+      color: #f87171;
+    }
+
+    .small {
+      font-size: 13px;
+      color: #8f8f8f;
+      margin-top: 18px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="card">
+    <h1>เข้าสู่ระบบ</h1>
+
+    <p>
+      กรุณาใช้อีเมลเดียวกับที่ใช้ชำระเงินหรือเคยได้รับสิทธิ์ใช้งาน LEGO SCANNER
+    </p>
+
+    <label for="email">อีเมล</label>
+    <input id="email" type="email" placeholder="your@email.com" autocomplete="email" />
+
+    <label for="password">รหัสผ่าน</label>
+    <input id="password" type="password" placeholder="อย่างน้อย 6 ตัวอักษร" autocomplete="current-password" />
+
+    <button onclick="login()">เข้าสู่ระบบ</button>
+    <button class="secondary" onclick="signup()">สร้างบัญชีด้วยอีเมลที่ใช้ชำระเงิน</button>
+    <button class="link" onclick="resetPassword()">ลืมรหัสผ่าน / ตั้งรหัสผ่านใหม่</button>
+
+    <div id="message" class="message"></div>
+
+    <p class="small">
+      ลูกค้าเก่าที่เคยเข้าใช้งานด้วย Magic Link ให้กด “สร้างบัญชี” และใช้อีเมลเดิม ระบบจะตรวจสิทธิ์ให้อัตโนมัติ
+    </p>
+  </div>
+
+  <script>
+    const SUPABASE_URL = 'ใส่_SUPABASE_URL_ตรงนี้';
+    const SUPABASE_ANON_KEY = 'ใส่_SUPABASE_ANON_KEY_ตรงนี้';
+
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    function getEmail() {
+      return document.getElementById('email').value.trim().toLowerCase();
+    }
+
+    function getPassword() {
+      return document.getElementById('password').value;
+    }
+
+    function showMessage(text, isError = false) {
+      const el = document.getElementById('message');
+      el.textContent = text;
+      el.className = isError ? 'message danger' : 'message';
+    }
+
+    async function checkCustomerAccess() {
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+
+      if (userError || !userData.user) {
+        return {
+          allowed: false,
+          reason: 'not_logged_in'
+        };
+      }
+
+      const email = userData.user.email.trim().toLowerCase();
+
+      const { data: customer, error } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('email', email)
+        .eq('active', true)
+        .is('deactivated_at', null)
+        .maybeSingle();
+
+      if (error) {
+        console.error(error);
+        return {
+          allowed: false,
+          reason: 'database_error'
+        };
+      }
+
+      if (!customer) {
+        return {
+          allowed: false,
+          reason: 'no_access'
+        };
+      }
+
+      return {
+        allowed: true,
+        customer
+      };
+    }
+
+    async function goAfterAuth() {
+      const access = await checkCustomerAccess();
+
+      if (access.allowed) {
+        window.location.href = '/';
+        return;
+      }
+
+      window.location.href = '/no-access.html';
+    }
+
+    async function login() {
+      const email = getEmail();
+      const password = getPassword();
+
+      if (!email || !password) {
+        showMessage('กรุณากรอกอีเมลและรหัสผ่าน', true);
+        return;
+      }
+
+      showMessage('กำลังเข้าสู่ระบบ...');
+
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+
+      if (error) {
+        showMessage('อีเมลหรือรหัสผ่านไม่ถูกต้อง', true);
+        return;
+      }
+
+      await goAfterAuth();
+    }
+
+    async function signup() {
+      const email = getEmail();
+      const password = getPassword();
+
+      if (!email || !password) {
+        showMessage('กรุณากรอกอีเมลและรหัสผ่าน', true);
+        return;
+      }
+
+      if (password.length < 6) {
+        showMessage('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร', true);
+        return;
+      }
+
+      showMessage('กำลังสร้างบัญชี...');
+
+      const { error } = await supabase.auth.signUp({
+        email,
+        password
+      });
+
+      if (error) {
+        if (error.message && error.message.toLowerCase().includes('already registered')) {
+          showMessage('อีเมลนี้มีบัญชีแล้ว กรุณากดเข้าสู่ระบบหรือลืมรหัสผ่าน', true);
+          return;
+        }
+
+        showMessage(error.message || 'สร้างบัญชีไม่สำเร็จ', true);
+        return;
+      }
+
+      await goAfterAuth();
+    }
+
+    async function resetPassword() {
+      const email = getEmail();
+
+      if (!email) {
+        showMessage('กรุณากรอกอีเมลก่อนกดตั้งรหัสผ่านใหม่', true);
+        return;
+      }
+
+      showMessage('กำลังส่งลิงก์ตั้งรหัสผ่าน...');
+
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: 'https://legoscanner.app/reset-password.html'
+      });
+
+      if (error) {
+        showMessage('ส่งลิงก์ตั้งรหัสผ่านไม่สำเร็จ', true);
+        return;
+      }
+
+      showMessage('ส่งลิงก์ตั้งรหัสผ่านไปที่อีเมลแล้ว กรุณาเช็กกล่องจดหมาย');
+    }
+  </script>
+</body>
+</html>
