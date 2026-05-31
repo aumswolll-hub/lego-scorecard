@@ -165,15 +165,21 @@
     />
 
     <button id="loginBtn" type="button">เข้าสู่ระบบ</button>
-    <button id="signupBtn" type="button" class="secondary">สร้างบัญชี / ตั้งรหัสผ่านครั้งแรก</button>
-    <button id="resetBtn" type="button" class="link">ลืมรหัสผ่าน / ตั้งรหัสผ่านใหม่</button>
+
+    <button id="signupBtn" type="button" class="secondary">
+      สร้างบัญชี / ตั้งรหัสผ่านครั้งแรก
+    </button>
+
+    <button id="resetBtn" type="button" class="link">
+      ลืมรหัสผ่าน / ตั้งรหัสผ่านใหม่
+    </button>
 
     <div id="message" class="message"></div>
 
     <div class="note-box">
       <strong>ลูกค้าเก่าที่เคยเข้าใช้งานด้วย Magic Link</strong><br>
       ให้ใส่อีเมลเดิม + ตั้งรหัสผ่านใหม่อย่างน้อย 6 ตัวอักษร แล้วกด
-      “สร้างบัญชี / ตั้งรหัสผ่านครั้งแรก”
+      “สร้างบัญชี / ตั้งรหัสผ่านครั้งแรก” ระบบจะตั้งรหัสผ่านให้ทันที
     </div>
 
     <p class="small">
@@ -258,6 +264,7 @@
 
       if (error) {
         console.error('Customer access error:', error);
+
         return {
           allowed: false,
           reason: 'database_error',
@@ -319,7 +326,12 @@
 
         if (error) {
           console.error('Login error:', error);
-          showMessage('อีเมลหรือรหัสผ่านไม่ถูกต้อง หากยังไม่เคยตั้งรหัสผ่าน ให้กด “สร้างบัญชี / ตั้งรหัสผ่านครั้งแรก”', 'error');
+
+          showMessage(
+            'อีเมลหรือรหัสผ่านไม่ถูกต้อง หากยังไม่เคยตั้งรหัสผ่าน ให้กด “สร้างบัญชี / ตั้งรหัสผ่านครั้งแรก”',
+            'error'
+          );
+
           return;
         }
 
@@ -355,7 +367,7 @@
       }
 
       setButtonsDisabled(true);
-      showMessage('กำลังสร้างบัญชี...');
+      showMessage('กำลังสร้างบัญชี / ตั้งรหัสผ่าน...');
 
       try {
         const res = await fetch('/api/register', {
@@ -372,11 +384,11 @@
         const data = await res.json().catch(() => ({}));
 
         if (!res.ok) {
-          showMessage(data.message || 'สร้างบัญชีไม่สำเร็จ', 'error');
+          showMessage(data.message || 'สร้างบัญชี / ตั้งรหัสผ่านไม่สำเร็จ', 'error');
           return;
         }
 
-        showMessage('สร้างบัญชีสำเร็จ กำลังเข้าสู่ระบบ...', 'success');
+        showMessage('ตั้งรหัสผ่านสำเร็จ กำลังเข้าสู่ระบบ...', 'success');
 
         const { error } = await sb.auth.signInWithPassword({
           email,
@@ -385,7 +397,12 @@
 
         if (error) {
           console.error('Login after register error:', error);
-          showMessage('สร้างบัญชีสำเร็จแล้ว กรุณากดเข้าสู่ระบบอีกครั้ง', 'success');
+
+          showMessage(
+            'ตั้งรหัสผ่านสำเร็จแล้ว กรุณากดเข้าสู่ระบบอีกครั้ง',
+            'success'
+          );
+
           return;
         }
 
@@ -421,7 +438,10 @@
           const msg = String(error.message || '').toLowerCase();
 
           if (msg.includes('rate limit')) {
-            showMessage('ระบบส่งอีเมลบ่อยเกินไป กรุณารอประมาณ 30-60 นาที แล้วลองใหม่อีกครั้ง', 'error');
+            showMessage(
+              'ระบบส่งอีเมลบ่อยเกินไป กรุณารอประมาณ 30-60 นาที แล้วลองใหม่อีกครั้ง หรือใช้ปุ่ม “สร้างบัญชี / ตั้งรหัสผ่านครั้งแรก” แทน',
+              'error'
+            );
             return;
           }
 
@@ -429,7 +449,10 @@
           return;
         }
 
-        showMessage('ส่งลิงก์ตั้งรหัสผ่านไปที่อีเมลแล้ว กรุณาเช็กกล่องจดหมาย / spam', 'success');
+        showMessage(
+          'ส่งลิงก์ตั้งรหัสผ่านไปที่อีเมลแล้ว กรุณาเช็กกล่องจดหมาย / spam',
+          'success'
+        );
       } catch (err) {
         console.error('Reset password unexpected error:', err);
         showMessage('ส่งลิงก์ตั้งรหัสผ่านไม่สำเร็จ กรุณาลองใหม่อีกครั้ง', 'error');
