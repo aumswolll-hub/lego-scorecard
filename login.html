@@ -79,8 +79,13 @@
       font-size: 15px;
     }
 
-    button:hover {
+    button:hover:not(:disabled) {
       opacity: 0.9;
+    }
+
+    button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
     }
 
     button.secondary {
@@ -117,6 +122,21 @@
       color: #8f8f8f;
       margin-top: 18px;
     }
+
+    .note-box {
+      margin-top: 18px;
+      padding: 12px 14px;
+      background: #101010;
+      border: 1px solid #2a2a2a;
+      border-radius: 12px;
+      font-size: 13px;
+      color: #b5b5b5;
+      line-height: 1.6;
+    }
+
+    .note-box strong {
+      color: #ffffff;
+    }
   </style>
 </head>
 
@@ -145,13 +165,19 @@
     />
 
     <button id="loginBtn" type="button">เข้าสู่ระบบ</button>
-    <button id="signupBtn" type="button" class="secondary">สร้างบัญชีด้วยอีเมลที่ใช้ชำระเงิน</button>
+    <button id="signupBtn" type="button" class="secondary">สร้างบัญชี / ตั้งรหัสผ่านครั้งแรก</button>
     <button id="resetBtn" type="button" class="link">ลืมรหัสผ่าน / ตั้งรหัสผ่านใหม่</button>
 
     <div id="message" class="message"></div>
 
+    <div class="note-box">
+      <strong>ลูกค้าเก่าที่เคยเข้าใช้งานด้วย Magic Link</strong><br>
+      ให้ใส่อีเมลเดิม + ตั้งรหัสผ่านใหม่อย่างน้อย 6 ตัวอักษร แล้วกด
+      “สร้างบัญชี / ตั้งรหัสผ่านครั้งแรก”
+    </div>
+
     <p class="small">
-      ลูกค้าเก่าที่เคยเข้าใช้งานด้วย Magic Link ให้กด “สร้างบัญชี” และใช้อีเมลเดิม ระบบจะตรวจสิทธิ์ให้อัตโนมัติ
+      ถ้าเคยสร้างบัญชีแล้ว ให้กด “เข้าสู่ระบบ” หรือ “ลืมรหัสผ่าน / ตั้งรหัสผ่านใหม่”
     </p>
   </div>
 
@@ -293,7 +319,7 @@
 
         if (error) {
           console.error('Login error:', error);
-          showMessage('อีเมลหรือรหัสผ่านไม่ถูกต้อง', 'error');
+          showMessage('อีเมลหรือรหัสผ่านไม่ถูกต้อง หากยังไม่เคยตั้งรหัสผ่าน ให้กด “สร้างบัญชี / ตั้งรหัสผ่านครั้งแรก”', 'error');
           return;
         }
 
@@ -310,13 +336,21 @@
       const email = getEmail();
       const password = getPassword();
 
-      if (!email || !password) {
-        showMessage('กรุณากรอกอีเมลและรหัสผ่าน', 'error');
+      if (!email) {
+        showMessage('กรุณากรอกอีเมลที่ใช้ชำระเงินหรือเคยได้รับสิทธิ์ใช้งาน', 'error');
+        document.getElementById('email').focus();
+        return;
+      }
+
+      if (!password) {
+        showMessage('กรุณาตั้งรหัสผ่านใหม่อย่างน้อย 6 ตัวอักษรก่อนกดสร้างบัญชี', 'error');
+        document.getElementById('password').focus();
         return;
       }
 
       if (password.length < 6) {
         showMessage('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร', 'error');
+        document.getElementById('password').focus();
         return;
       }
 
@@ -324,33 +358,41 @@
       showMessage('กำลังสร้างบัญชี...');
 
       try {
-        const { error } = await sb.auth.signUp({
+        const res = await fetch('/api/register', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            email,
+            password
+          })
+        });
+
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          showMessage(data.message || 'สร้างบัญชีไม่สำเร็จ', 'error');
+          return;
+        }
+
+        showMessage('สร้างบัญชีสำเร็จ กำลังเข้าสู่ระบบ...', 'success');
+
+        const { error } = await sb.auth.signInWithPassword({
           email,
           password
         });
 
         if (error) {
-          console.error('Signup error:', error);
-
-          const msg = error.message || '';
-
-          if (
-            msg.toLowerCase().includes('already') ||
-            msg.toLowerCase().includes('registered') ||
-            msg.toLowerCase().includes('exists')
-          ) {
-            showMessage('อีเมลนี้มีบัญชีแล้ว กรุณากดเข้าสู่ระบบหรือลืมรหัสผ่าน', 'error');
-            return;
-          }
-
-          showMessage(msg || 'สร้างบัญชีไม่สำเร็จ', 'error');
+          console.error('Login after register error:', error);
+          showMessage('สร้างบัญชีสำเร็จแล้ว กรุณากดเข้าสู่ระบบอีกครั้ง', 'success');
           return;
         }
 
         await goAfterAuth();
       } catch (err) {
         console.error('Signup unexpected error:', err);
-        showMessage('สร้างบัญชีไม่สำเร็จ กรุณาลองใหม่อีกครั้ง', 'error');
+        showMessage('ระบบมีปัญหาชั่วคราว กรุณาลองใหม่อีกครั้ง', 'error');
       } finally {
         setButtonsDisabled(false);
       }
@@ -361,6 +403,7 @@
 
       if (!email) {
         showMessage('กรุณากรอกอีเมลก่อนกดตั้งรหัสผ่านใหม่', 'error');
+        document.getElementById('email').focus();
         return;
       }
 
@@ -374,11 +417,19 @@
 
         if (error) {
           console.error('Reset password error:', error);
-          showMessage('ส่งลิงก์ตั้งรหัสผ่านไม่สำเร็จ', 'error');
+
+          const msg = String(error.message || '').toLowerCase();
+
+          if (msg.includes('rate limit')) {
+            showMessage('ระบบส่งอีเมลบ่อยเกินไป กรุณารอประมาณ 30-60 นาที แล้วลองใหม่อีกครั้ง', 'error');
+            return;
+          }
+
+          showMessage('ส่งลิงก์ตั้งรหัสผ่านไม่สำเร็จ กรุณาลองใหม่อีกครั้ง', 'error');
           return;
         }
 
-        showMessage('ส่งลิงก์ตั้งรหัสผ่านไปที่อีเมลแล้ว กรุณาเช็กกล่องจดหมาย', 'success');
+        showMessage('ส่งลิงก์ตั้งรหัสผ่านไปที่อีเมลแล้ว กรุณาเช็กกล่องจดหมาย / spam', 'success');
       } catch (err) {
         console.error('Reset password unexpected error:', err);
         showMessage('ส่งลิงก์ตั้งรหัสผ่านไม่สำเร็จ กรุณาลองใหม่อีกครั้ง', 'error');
@@ -395,6 +446,18 @@
       document.getElementById('loginBtn').addEventListener('click', login);
       document.getElementById('signupBtn').addEventListener('click', signup);
       document.getElementById('resetBtn').addEventListener('click', resetPassword);
+
+      document.getElementById('password').addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+          login();
+        }
+      });
+
+      document.getElementById('email').addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+          document.getElementById('password').focus();
+        }
+      });
     });
   </script>
 </body>
