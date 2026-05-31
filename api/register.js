@@ -1,10 +1,14 @@
-// /api/register.js — Create password login for existing eligible customers
+// /api/register.js — Create or reset password for eligible LEGO customers
 // POST { email, password }
 //
 // Flow:
 // 1. Check public.customers first
-// 2. If customer has access, create Supabase Auth user with email_confirm = true
-// 3. Customer can login immediately
+// 2. If customer has access:
+//    - if Auth user does not exist → create confirmed user
+//    - if Auth user exists → update password directly
+// 3. Frontend can login immediately with email + password
+//
+// This avoids email reset rate limit for legacy Magic Link customers.
 
 import { createClient } from "@supabase/supabase-js";
 
@@ -35,10 +39,7 @@ function createSupabaseAdmin() {
       },
     });
 
-    return {
-      client,
-      error: null,
-    };
+    return { client, error: null };
   } catch (err) {
     return {
       client: null,
@@ -51,7 +52,7 @@ async function findAuthUserByEmail(supabase, email) {
   const perPage = 100;
   let page = 1;
 
-  while (page <= 20) {
+  while (page <= 30) {
     const { data, error } = await supabase.auth.admin.listUsers({
       page,
       perPage,
@@ -122,7 +123,7 @@ export default async function handler(req, res) {
       });
     }
 
-    // 1) Check entitlement in customers first
+    // 1) Check entitlement first
     const { data: customer, error: customerError } = await supabase
       .from("customers")
       .select(
@@ -151,7 +152,7 @@ export default async function handler(req, res) {
       });
     }
 
-    // 2) Check if auth user already exists
+    // 2) Find auth user
     let existingUser = null;
 
     try {
@@ -165,42 +166,58 @@ export default async function handler(req, res) {
       });
     }
 
+    // 3A) Existing Auth user → update password directly
     if (existingUser) {
-      return res.status(409).json({
-        error: "already_exists",
-        message:
-          "อีเมลนี้มีบัญชีแล้ว กรุณากดเข้าสู่ระบบ หรือกดลืมรหัสผ่าน / ตั้งรหัสผ่านใหม่",
+      const { data: updated, error: updateError } =
+        await supabase.auth.admin.updateUserById(existingUser.id, {
+          password,
+          email_confirm: true,
+          user_metadata: {
+            ...(existingUser.user_metadata || {}),
+            source: "lego_scanner_register_password_update",
+            plan: customer.plan || "customer",
+            password_updated_at: new Date().toISOString(),
+          },
+        });
+
+      if (updateError) {
+        console.error("[register] update password error:", updateError);
+
+        return res.status(500).json({
+          error: "update_password_failed",
+          message: "ตั้งรหัสผ่านไม่สำเร็จ กรุณาลองใหม่",
+          detail: updateError.message || updateError,
+        });
+      }
+
+      console.log("[register] updated password for existing auth user:", {
+        email,
+        userId: updated?.user?.id || existingUser.id,
+        plan: customer.plan,
+      });
+
+      return res.status(200).json({
+        ok: true,
+        email,
+        mode: "password_updated",
+        message: "ตั้งรหัสผ่านสำเร็จ กำลังเข้าสู่ระบบ",
       });
     }
 
-    // 3) Create confirmed auth user
+    // 3B) No Auth user → create confirmed user
     const { data: created, error: createError } =
       await supabase.auth.admin.createUser({
         email,
         password,
         email_confirm: true,
         user_metadata: {
-          source: "lego_scanner_register",
+          source: "lego_scanner_register_new_user",
           plan: customer.plan || "customer",
         },
       });
 
     if (createError) {
       console.error("[register] create auth user error:", createError);
-
-      const msg = String(createError.message || "").toLowerCase();
-
-      if (
-        msg.includes("already") ||
-        msg.includes("registered") ||
-        msg.includes("exists")
-      ) {
-        return res.status(409).json({
-          error: "already_exists",
-          message:
-            "อีเมลนี้มีบัญชีแล้ว กรุณากดเข้าสู่ระบบ หรือกดลืมรหัสผ่าน / ตั้งรหัสผ่านใหม่",
-        });
-      }
 
       return res.status(500).json({
         error: "create_user_failed",
@@ -218,7 +235,8 @@ export default async function handler(req, res) {
     return res.status(200).json({
       ok: true,
       email,
-      message: "สร้างบัญชีสำเร็จ กรุณาเข้าสู่ระบบ",
+      mode: "created",
+      message: "สร้างบัญชีสำเร็จ กำลังเข้าสู่ระบบ",
     });
   } catch (err) {
     console.error("[register] server error:", err);
