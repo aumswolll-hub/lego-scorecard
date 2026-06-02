@@ -4686,5 +4686,275 @@ updateAll();
   }
 })();
 </script>
+  <script>
+/* ════════════════════════════════════════════════
+   FINAL SAVE BUTTON OVERRIDE PATCH
+   Fix: rare user cannot save even when all filters are filled
+   Place this as the LAST script before </body>
+════════════════════════════════════════════════ */
+
+(function finalSaveButtonOverridePatch() {
+  if (window.__legoFinalSaveOverrideInstalled) return;
+  window.__legoFinalSaveOverrideInstalled = true;
+
+  function el(id) {
+    return document.getElementById(id);
+  }
+
+  function textVal(id) {
+    const node = el(id);
+    return node ? String(node.value || "").trim() : "";
+  }
+
+  function numVal(id) {
+    const raw = textVal(id);
+    if (raw === "") return null;
+
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function hasText(id) {
+    return textVal(id) !== "";
+  }
+
+  function getMode() {
+    try {
+      if (typeof currentMode !== "undefined") {
+        if (currentMode === "validation" || currentMode === "discovery") {
+          return currentMode;
+        }
+      }
+    } catch (e) {}
+
+    try {
+      const saved = localStorage.getItem("lego_scorecard_mode");
+      if (saved === "validation" || saved === "discovery") return saved;
+    } catch (e) {}
+
+    return "validation";
+  }
+
+  function hasAngle() {
+    for (let i = 1; i <= 5; i++) {
+      if (hasText("angle" + i)) return true;
+    }
+
+    return false;
+  }
+
+  function validationComplete() {
+    return (
+      hasText("productName") &&
+      numVal("v_commission") !== null &&
+      numVal("v_orders7") !== null &&
+      numVal("v_orders30") !== null &&
+      numVal("v_ctr") !== null &&
+      numVal("v_atc7") !== null &&
+      numVal("v_atc30") !== null &&
+      numVal("v_creators7") !== null &&
+      numVal("v_creators30") !== null &&
+      numVal("v_stock") !== null
+    );
+  }
+
+  function discoveryComplete() {
+    return (
+      hasText("productName") &&
+      numVal("gmv7") !== null &&
+      numVal("gmv30") !== null &&
+      hasAngle() &&
+      numVal("cr") !== null &&
+      numVal("conc") !== null
+    );
+  }
+
+  function formComplete() {
+    return getMode() === "discovery"
+      ? discoveryComplete()
+      : validationComplete();
+  }
+
+  function canUserScan() {
+    try {
+      if (!usageState) return true;
+
+      if (
+        usageState.is_admin ||
+        usageState.plan === "admin" ||
+        usageState.state === "admin"
+      ) {
+        return true;
+      }
+
+      return usageState.can_scan !== false;
+    } catch (e) {
+      return true;
+    }
+  }
+
+  function forceButtonState() {
+    const btn = el("saveBtn");
+    if (!btn) return;
+
+    btn.textContent = "ดูผลและบันทึก";
+
+    const ready = formComplete();
+
+    if (!ready) {
+      btn.disabled = true;
+      btn.title = "กรอกข้อมูลให้ครบก่อนดูผลและบันทึก";
+      return;
+    }
+
+    btn.disabled = false;
+
+    if (!canUserScan()) {
+      btn.title = "ใช้ครบแล้ว กดเพื่อดูแพ็กเกจ";
+    } else {
+      btn.title = "กดเพื่อดูผลและบันทึกเข้า Tracker";
+    }
+  }
+
+  function unlockResult() {
+    try {
+      window.resultUnlocked = true;
+      resultUnlocked = true;
+    } catch (e) {
+      window.resultUnlocked = true;
+    }
+
+    document.body.classList.remove("result-locked");
+  }
+
+  function lockResultAgain() {
+    try {
+      window.resultUnlocked = false;
+      resultUnlocked = false;
+    } catch (e) {
+      window.resultUnlocked = false;
+    }
+
+    document.body.classList.add("result-locked");
+  }
+
+  function showMsg(msg) {
+    if (typeof showToast === "function") {
+      showToast(msg);
+    } else {
+      alert(msg);
+    }
+  }
+
+  function patchSaveProductFinal() {
+    if (typeof saveProduct !== "function") return;
+    if (window.__legoFinalSaveProductPatched) return;
+
+    const originalSaveProduct = saveProduct;
+
+    saveProduct = function finalPatchedSaveProduct() {
+      forceButtonState();
+
+      if (!formComplete()) {
+        showMsg("กรอกข้อมูลให้ครบก่อนดูผลและบันทึก");
+        return;
+      }
+
+      if (!canUserScan()) {
+        if (typeof showPaywall === "function") {
+          showPaywall();
+        } else {
+          showMsg("สิทธิ์การใช้งานครบแล้ว กรุณาติดต่อทีมงาน");
+        }
+
+        return;
+      }
+
+      unlockResult();
+
+      if (typeof updateAll === "function") {
+        updateAll();
+      }
+
+      setTimeout(function () {
+        unlockResult();
+        forceButtonState();
+      }, 0);
+
+      return originalSaveProduct.apply(this, arguments);
+    };
+
+    window.__legoFinalSaveProductPatched = true;
+  }
+
+  function installInputListeners() {
+    document.addEventListener("input", function (e) {
+      if (!e.target || !e.target.matches("input")) return;
+
+      lockResultAgain();
+
+      setTimeout(forceButtonState, 0);
+      setTimeout(forceButtonState, 100);
+      setTimeout(forceButtonState, 300);
+    }, true);
+
+    document.addEventListener("change", function (e) {
+      if (!e.target || !e.target.matches("input")) return;
+
+      lockResultAgain();
+
+      setTimeout(forceButtonState, 0);
+      setTimeout(forceButtonState, 100);
+      setTimeout(forceButtonState, 300);
+    }, true);
+
+    document.addEventListener("click", function () {
+      setTimeout(forceButtonState, 0);
+      setTimeout(forceButtonState, 150);
+    }, true);
+  }
+
+  function installButtonDirectClick() {
+    const btn = el("saveBtn");
+    if (!btn) return;
+
+    btn.addEventListener("click", function (e) {
+      if (!formComplete()) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        showMsg("กรอกข้อมูลให้ครบก่อนดูผลและบันทึก");
+        forceButtonState();
+        return false;
+      }
+
+      if (!canUserScan()) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+
+        if (typeof showPaywall === "function") {
+          showPaywall();
+        } else {
+          showMsg("สิทธิ์การใช้งานครบแล้ว กรุณาติดต่อทีมงาน");
+        }
+
+        return false;
+      }
+
+      unlockResult();
+      forceButtonState();
+    }, true);
+  }
+
+  patchSaveProductFinal();
+  installInputListeners();
+
+  setTimeout(function () {
+    installButtonDirectClick();
+    forceButtonState();
+  }, 300);
+
+  setInterval(forceButtonState, 300);
+})();
+</script>
 </body>
 </html>
