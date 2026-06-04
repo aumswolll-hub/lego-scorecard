@@ -4956,5 +4956,552 @@ updateAll();
   setInterval(forceButtonState, 300);
 })();
 </script>
+  <script>
+/* ════════════════════════════════════════════════
+   LEGO SCANNER — FINAL AUTH + FREE SIGNUP PATCH
+   Paste this as the LAST script before </body>
+   Purpose:
+   - Replace old Magic Link UI on index
+   - Free user can signup with email + password
+   - Free user gets 3 scans via /api/usage
+   - Paid users still get entitlement from customers table
+   - Prevent old duplicate auth guards from blocking free users
+════════════════════════════════════════════════ */
+
+(function legoFinalAuthFreeSignupPatch() {
+  if (window.__legoFinalAuthFreeSignupPatchInstalled) return;
+  window.__legoFinalAuthFreeSignupPatchInstalled = true;
+
+  const SUPABASE_URL = "https://kdfyfnolxhcxswbotolq.supabase.co";
+  const SUPABASE_KEY = "sb_publishable_RxZbbxePB1RakFMi-h7LIQ_EVv0AS9_";
+  const SESSION_STORAGE_KEY = "lego_session";
+
+  let sbClient = null;
+
+  function getSupabaseClient() {
+    if (sbClient) return sbClient;
+
+    if (!window.supabase) {
+      showAuthError("ระบบ Login ยังโหลดไม่เสร็จ กรุณารีเฟรชหน้าอีกครั้ง");
+      return null;
+    }
+
+    sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    return sbClient;
+  }
+
+  function $(id) {
+    return document.getElementById(id);
+  }
+
+  function safeText(id, text) {
+    const el = $(id);
+    if (el) el.textContent = text || "";
+  }
+
+  function getEmail() {
+    const el = $("emailInput");
+    return el ? String(el.value || "").trim().toLowerCase() : "";
+  }
+
+  function getPassword() {
+    const el = $("passwordInput");
+    return el ? String(el.value || "") : "";
+  }
+
+  function showAuthError(msg) {
+    safeText("loginSuccess", "");
+    safeText("loginError", msg || "");
+  }
+
+  function showAuthSuccess(msg) {
+    safeText("loginError", "");
+    safeText("loginSuccess", msg || "");
+  }
+
+  function setAuthButtonsDisabled(disabled) {
+    ["signupBtn", "loginBtn", "resetBtn"].forEach(function(id) {
+      const btn = $(id);
+      if (btn) btn.disabled = disabled;
+    });
+  }
+
+  function validateEmailPassword(requirePassword) {
+    const email = getEmail();
+    const password = getPassword();
+
+    if (!email || !email.includes("@")) {
+      showAuthError("กรุณากรอก Email ให้ถูกต้อง");
+      return null;
+    }
+
+    if (requirePassword && !password) {
+      showAuthError("กรุณากรอก Password");
+      return null;
+    }
+
+    if (requirePassword && password.length < 6) {
+      showAuthError("Password ต้องมีอย่างน้อย 6 ตัวอักษร");
+      return null;
+    }
+
+    return { email, password };
+  }
+
+  function createSessionObject(email, accessToken) {
+    return {
+      email: email,
+      token: accessToken,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      provider: "supabase"
+    };
+  }
+
+  function setRealCurrentSession(sessionObj) {
+    try {
+      currentSession = sessionObj;
+    } catch (e) {}
+
+    window.currentSession = sessionObj;
+
+    try {
+      localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(sessionObj));
+    } catch (e) {
+      console.error("[auth] cannot save session:", e);
+    }
+  }
+
+  function showAppSafely(sessionObj) {
+    setRealCurrentSession(sessionObj);
+
+    const loginScreen = $("loginScreen");
+    const verifyScreen = $("verifyScreen");
+    const app = $("app");
+    const userInfo = $("userInfo");
+
+    if (loginScreen) loginScreen.style.display = "none";
+    if (verifyScreen) verifyScreen.style.display = "none";
+    if (app) app.classList.add("active");
+    if (userInfo) userInfo.textContent = sessionObj.email;
+
+    try { if (typeof renderTracker === "function") renderTracker(); } catch (e) {}
+    try { if (typeof updateTrackerCount === "function") updateTrackerCount(); } catch (e) {}
+    try { if (typeof initMode === "function") initMode(); } catch (e) {}
+    try { if (typeof updateDashBanner === "function") updateDashBanner(); } catch (e) {}
+    try { if (typeof updateTrackerUpsell === "function") updateTrackerUpsell(); } catch (e) {}
+    try { if (typeof pullTrackerFromCloud === "function") pullTrackerFromCloud(); } catch (e) {}
+    try { if (typeof loadUsageState === "function") loadUsageState(); } catch (e) {}
+    try { if (typeof updateAll === "function") updateAll(); } catch (e) {}
+  }
+
+  function patchLoginCSS() {
+    if ($("legoFinalAuthCSS")) return;
+
+    const style = document.createElement("style");
+    style.id = "legoFinalAuthCSS";
+    style.textContent = `
+      #emailInput,
+      #passwordInput {
+        width: 100%;
+        background: transparent;
+        border: none;
+        border-bottom: 1.5px solid var(--ink);
+        padding: 12px 0;
+        font-family: 'Fraunces', serif;
+        font-weight: 500;
+        font-size: 20px;
+        color: var(--ink);
+        outline: none;
+      }
+
+      #emailInput::placeholder,
+      #passwordInput::placeholder {
+        color: var(--ink-mute);
+        opacity: 0.5;
+        font-weight: 400;
+      }
+
+      #emailInput:focus,
+      #passwordInput:focus {
+        border-bottom-color: var(--red);
+      }
+
+      .lego-auth-secondary-btn {
+        margin-top: 12px !important;
+        background: transparent !important;
+        color: var(--ink) !important;
+        border: 1.5px solid var(--ink) !important;
+      }
+
+      .lego-auth-link-btn {
+        margin-top: 12px !important;
+        background: transparent !important;
+        color: var(--ink-mute) !important;
+        border: 1px solid var(--grey-line) !important;
+        font-size: 11px !important;
+      }
+
+      .lego-free-note {
+        margin-top: 14px;
+        padding: 12px 14px;
+        border: 1.5px solid var(--gold);
+        background: rgba(196,154,74,0.12);
+        font-size: 12px;
+        line-height: 1.55;
+        color: var(--ink);
+      }
+
+      .lego-free-note strong {
+        color: var(--red);
+      }
+    `;
+
+    document.head.appendChild(style);
+  }
+
+  function patchLoginUI() {
+    patchLoginCSS();
+
+    const loginCard = document.querySelector("#loginScreen .login-card");
+    if (!loginCard) return;
+
+    loginCard.innerHTML = `
+      <div class="login-mark">LEGO METHOD™</div>
+
+      <h1 class="serif">เช็กสินค้า<br><em>ก่อนทำคลิป</em></h1>
+
+      <p class="sub">
+        ใช้ฟรี 3 ครั้ง เพียงกรอก Email + Password แล้วกด “สร้างบัญชี”
+        หลังจากนั้นเข้าใช้งาน LEGO SCANNER ได้ทันที
+      </p>
+
+      <label class="field-label">Email สำหรับเข้าใช้งาน</label>
+      <input
+        type="email"
+        id="emailInput"
+        placeholder="you@example.com"
+        autocomplete="email"
+      >
+
+      <label class="field-label" style="margin-top:18px;">Password</label>
+      <input
+        type="password"
+        id="passwordInput"
+        placeholder="ตั้งรหัสผ่านอย่างน้อย 6 ตัวอักษร"
+        autocomplete="new-password"
+      >
+
+      <div class="login-error" id="loginError"></div>
+      <div class="login-success" id="loginSuccess"></div>
+
+      <button class="login-btn" id="signupBtn" type="button" onclick="signupFreeAccount()">
+        สร้างบัญชีใช้ฟรี 3 ครั้ง
+      </button>
+
+      <button class="login-btn lego-auth-secondary-btn" id="loginBtn" type="button" onclick="loginWithPassword()">
+        เข้าสู่ระบบ
+      </button>
+
+      <button class="login-btn lego-auth-link-btn" id="resetBtn" type="button" onclick="resetPasswordFromIndex()">
+        ลืมรหัสผ่าน / ตั้งรหัสผ่านใหม่
+      </button>
+
+      <div class="lego-free-note">
+        <strong>ใช้ฟรี 3 ครั้ง</strong> · ไม่ต้องผูกบัตร · ใช้ข้อมูลจริงจาก TikTok Shop<br>
+        ถ้าคุณซื้อ Scanner / SPRINT / LEGO METHOD แล้ว กรุณาใช้ Email เดียวกับที่ชำระเงิน ระบบจะปลดล็อกสิทธิ์ให้อัตโนมัติ
+      </div>
+
+      <div class="login-proof">
+        <div class="proof-row">
+          <span class="proof-k">SCANNER</span>
+          <span class="proof-v">ช่วยเช็กว่าสินค้านี้คุ้มทำไหม</span>
+        </div>
+        <div class="proof-row">
+          <span class="proof-k">METHOD</span>
+          <span class="proof-v">สอนว่าหลังจากเจอสินค้าที่ใช่แล้ว ต้องทำคลิปยังไงให้ขาย</span>
+        </div>
+      </div>
+
+      <div class="login-steps">
+        <div><strong>1</strong><span>กรอก Email + Password แล้วกดสร้างบัญชี</span></div>
+        <div><strong>2</strong><span>อัปโหลดรูปสินค้า หรือกรอกตัวเลขเอง</span></div>
+        <div><strong>3</strong><span>รู้เลยว่าสินค้านี้น่าทำ ลองเบา ๆ หรือควรข้าม</span></div>
+      </div>
+
+      <p class="hint">
+        ลูกค้าเก่าให้กด “เข้าสู่ระบบ” ด้วย Email เดิมที่ใช้ชำระเงิน<br>
+        ถ้ายังไม่เคยตั้ง Password ให้กด “ลืมรหัสผ่าน / ตั้งรหัสผ่านใหม่”
+      </p>
+    `;
+
+    const emailInput = $("emailInput");
+    if (emailInput) emailInput.focus();
+  }
+
+  function showLoginScreenSafely() {
+    patchLoginUI();
+
+    const loginScreen = $("loginScreen");
+    const verifyScreen = $("verifyScreen");
+    const app = $("app");
+
+    if (verifyScreen) verifyScreen.style.display = "none";
+    if (app) app.classList.remove("active");
+    if (loginScreen) loginScreen.style.display = "grid";
+  }
+
+  async function getCurrentSupabaseSession() {
+    const sb = getSupabaseClient();
+    if (!sb) return null;
+
+    const { data, error } = await sb.auth.getSession();
+
+    if (error) {
+      console.error("[auth] getSession error:", error);
+      return null;
+    }
+
+    return data && data.session ? data.session : null;
+  }
+
+  async function bootFinalAuth() {
+    try {
+      patchLoginUI();
+
+      const params = new URLSearchParams(window.location.search);
+      const token = params.get("token");
+
+      if (token && typeof verifyToken === "function") {
+        verifyToken(token);
+        return;
+      }
+
+      const supabaseSession = await getCurrentSupabaseSession();
+
+      if (supabaseSession && supabaseSession.user && supabaseSession.user.email && supabaseSession.access_token) {
+        const email = supabaseSession.user.email.trim().toLowerCase();
+        const sessionObj = createSessionObject(email, supabaseSession.access_token);
+        showAppSafely(sessionObj);
+        return;
+      }
+
+      try {
+        const saved = JSON.parse(localStorage.getItem(SESSION_STORAGE_KEY) || "null");
+
+        if (saved && saved.email && saved.token && saved.expiresAt && new Date(saved.expiresAt) > new Date()) {
+          showAppSafely(saved);
+          return;
+        }
+      } catch (e) {}
+
+      showLoginScreenSafely();
+    } catch (err) {
+      console.error("[auth] bootFinalAuth error:", err);
+      showLoginScreenSafely();
+    }
+  }
+
+  window.signupFreeAccount = async function signupFreeAccount() {
+    const input = validateEmailPassword(true);
+    if (!input) return;
+
+    const sb = getSupabaseClient();
+    if (!sb) return;
+
+    setAuthButtonsDisabled(true);
+    showAuthSuccess("กำลังสร้างบัญชีใช้ฟรี 3 ครั้ง...");
+
+    try {
+      const { data, error } = await sb.auth.signUp({
+        email: input.email,
+        password: input.password
+      });
+
+      if (error) {
+        const msg = String(error.message || "").toLowerCase();
+
+        if (
+          msg.includes("already") ||
+          msg.includes("registered") ||
+          msg.includes("exists") ||
+          msg.includes("user already registered")
+        ) {
+          showAuthError("Email นี้มีบัญชีแล้ว ให้กด “เข้าสู่ระบบ” หรือ “ลืมรหัสผ่าน”");
+          return;
+        }
+
+        if (msg.includes("rate limit")) {
+          showAuthError("ระบบส่ง Email ถี่เกินไป กรุณารอสักครู่แล้วลองใหม่");
+          return;
+        }
+
+        showAuthError(error.message || "สร้างบัญชีไม่สำเร็จ");
+        return;
+      }
+
+      if (data && data.session && data.session.access_token) {
+        const sessionObj = createSessionObject(input.email, data.session.access_token);
+        showAuthSuccess("สร้างบัญชีสำเร็จ กำลังเปิด Scanner...");
+        setTimeout(function() {
+          showAppSafely(sessionObj);
+        }, 400);
+        return;
+      }
+
+      showAuthSuccess("สร้างบัญชีแล้ว กรุณาเช็ก Email เพื่อยืนยันบัญชี จากนั้นกลับมา Login อีกครั้ง");
+    } catch (err) {
+      console.error("[auth] signup error:", err);
+      showAuthError("สร้างบัญชีไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+    } finally {
+      setAuthButtonsDisabled(false);
+    }
+  };
+
+  window.loginWithPassword = async function loginWithPassword() {
+    const input = validateEmailPassword(true);
+    if (!input) return;
+
+    const sb = getSupabaseClient();
+    if (!sb) return;
+
+    setAuthButtonsDisabled(true);
+    showAuthSuccess("กำลังเข้าสู่ระบบ...");
+
+    try {
+      const { data, error } = await sb.auth.signInWithPassword({
+        email: input.email,
+        password: input.password
+      });
+
+      if (error) {
+        const msg = String(error.message || "").toLowerCase();
+
+        if (msg.includes("invalid login")) {
+          showAuthError("Email หรือ Password ไม่ถูกต้อง");
+          return;
+        }
+
+        if (msg.includes("email not confirmed")) {
+          showAuthError("กรุณายืนยัน Email ก่อนเข้าใช้งาน");
+          return;
+        }
+
+        if (msg.includes("rate limit")) {
+          showAuthError("ระบบ Login ถี่เกินไป กรุณารอสักครู่แล้วลองใหม่");
+          return;
+        }
+
+        showAuthError(error.message || "เข้าสู่ระบบไม่สำเร็จ");
+        return;
+      }
+
+      if (!data || !data.session || !data.session.access_token) {
+        showAuthError("เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่");
+        return;
+      }
+
+      const sessionObj = createSessionObject(input.email, data.session.access_token);
+      showAuthSuccess("เข้าสู่ระบบสำเร็จ กำลังเปิด Scanner...");
+
+      setTimeout(function() {
+        showAppSafely(sessionObj);
+      }, 400);
+    } catch (err) {
+      console.error("[auth] login error:", err);
+      showAuthError("เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+    } finally {
+      setAuthButtonsDisabled(false);
+    }
+  };
+
+  window.resetPasswordFromIndex = async function resetPasswordFromIndex() {
+    const email = getEmail();
+
+    if (!email || !email.includes("@")) {
+      showAuthError("กรุณากรอก Email ก่อนกดตั้งรหัสผ่านใหม่");
+      return;
+    }
+
+    const sb = getSupabaseClient();
+    if (!sb) return;
+
+    setAuthButtonsDisabled(true);
+    showAuthSuccess("กำลังส่งลิงก์ตั้งรหัสผ่านใหม่...");
+
+    try {
+      const { error } = await sb.auth.resetPasswordForEmail(email, {
+        redirectTo: "https://legoscanner.app/reset-password.html"
+      });
+
+      if (error) {
+        const msg = String(error.message || "").toLowerCase();
+
+        if (msg.includes("rate limit")) {
+          showAuthError("ระบบส่ง Email ถี่เกินไป กรุณารอสักครู่แล้วลองใหม่");
+          return;
+        }
+
+        showAuthError(error.message || "ส่งลิงก์ไม่สำเร็จ");
+        return;
+      }
+
+      showAuthSuccess("ส่งลิงก์ตั้งรหัสผ่านใหม่ไปที่ Email แล้ว กรุณาเช็ก inbox / spam");
+    } catch (err) {
+      console.error("[auth] reset error:", err);
+      showAuthError("ส่งลิงก์ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+    } finally {
+      setAuthButtonsDisabled(false);
+    }
+  };
+
+  window.logout = async function logoutFinal() {
+    if (!confirm("ออกจากระบบ? (ข้อมูล Tracker ใน browser นี้จะยังอยู่)")) return;
+
+    try {
+      const sb = getSupabaseClient();
+      if (sb) await sb.auth.signOut();
+    } catch (e) {
+      console.error("[auth] logout error:", e);
+    }
+
+    try {
+      localStorage.removeItem(SESSION_STORAGE_KEY);
+    } catch (e) {}
+
+    try {
+      currentSession = null;
+    } catch (e) {}
+
+    window.currentSession = null;
+    window.location.href = "/";
+  };
+
+  document.addEventListener("keydown", function(e) {
+    if (e.key !== "Enter") return;
+
+    const active = document.activeElement;
+    if (!active) return;
+
+    if (active.id === "emailInput" || active.id === "passwordInput") {
+      e.preventDefault();
+      window.signupFreeAccount();
+    }
+  });
+
+  window.addEventListener("pageshow", function() {
+    setTimeout(patchLoginUI, 50);
+  });
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", function() {
+      setTimeout(bootFinalAuth, 0);
+    });
+  } else {
+    setTimeout(bootFinalAuth, 0);
+  }
+
+  setTimeout(bootFinalAuth, 300);
+})();
+</script>
 </body>
 </html>
