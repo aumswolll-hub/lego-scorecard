@@ -1386,7 +1386,29 @@ body.result-locked .result-block::after {
   padding: 20px;
   z-index: 5;
 }
+/* ── DISABLE ALL UPSELL UI PATCH ── */
+/* Scanner ตอนนี้ไม่เปิดใช้ฟรี/ไม่ใช้เป็น upsell funnel แล้ว */
+#creditBanner,
+#dashBanner,
+#upsellResult,
+#trackerUpsell,
+.upsell-sidebar,
+.upgrade-overlay,
+#upgradeOverlay,
+.paywall-overlay,
+#paywallOverlay {
+  display: none !important;
+}
 
+/* เอา layout กลับมาเป็นหน้าเดียว ไม่เว้นช่อง sidebar */
+.scorecard-layout {
+  grid-template-columns: 1fr !important;
+}
+
+.scorecard-main {
+  max-width: 980px;
+  width: 100%;
+}
 </style>
 </head>
 <body>
