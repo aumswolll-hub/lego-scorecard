@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin · Scan Intelligence · LEGO SCANNER</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,700;1,500&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --ink: #1A1817; --cream: #F5EFE6; --cream-soft: #FAF6EE;
+      --red: #C8312B; --gold: #C49A4A;
+      --green: #2E7D32; --yellow: #C68B0B;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: 'IBM Plex Sans Thai', sans-serif; background: var(--cream); color: var(--ink); font-size: 15px; line-height: 1.55; -webkit-font-smoothing: antialiased; }
+    .topbar { position: sticky; top: 0; background: var(--cream); border-bottom: 1.5px solid var(--ink); padding: 14px 28px; display: flex; align-items: center; justify-content: space-between; z-index: 100; }
+    .brand { display: flex; align-items: center; gap: 12px; text-decoration: none; color: inherit; }
+    .brand .mark { background: var(--ink); color: var(--cream); padding: 5px 9px; font-family: 'Fraunces', serif; font-weight: 700; font-size: 11px; letter-spacing: 0.2em; }
+    .brand .name { font-family: 'Fraunces', serif; font-weight: 700; font-size: 18px; }
+    .brand .name em { font-style: italic; color: var(--red); font-weight: 500; }
+    .admin-tag { background: var(--red); color: var(--cream); font-size: 10px; padding: 3px 8px; letter-spacing: 0.2em; font-weight: 700; }
+    .nav { display: flex; gap: 18px; }
+    .nav a { color: var(--ink); text-decoration: none; font-size: 13px; opacity: 0.7; }
+
+    main { max-width: 1200px; margin: 0 auto; padding: 32px 24px 80px; }
+    h1 { font-family: 'Fraunces', serif; font-weight: 700; font-size: 32px; margin: 0 0 6px; }
+    h1 em { font-style: italic; color: var(--red); font-weight: 500; }
+    .sub { color: rgba(26,24,23,0.65); font-size: 14px; margin-bottom: 28px; }
+
+    .state { text-align: center; padding: 80px 20px; color: rgba(26,24,23,0.55); }
+    .state.error { color: var(--red); font-weight: 600; }
+    .state.forbidden { color: var(--red); font-weight: 700; font-family: 'Fraunces', serif; font-size: 22px; }
+
+    .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 28px; }
+    .stat-card { background: var(--cream-soft); border: 1.5px solid var(--ink); padding: 18px; }
+    .stat-card .label { font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase; color: rgba(26,24,23,0.55); font-weight: 600; margin-bottom: 8px; }
+    .stat-card .value { font-family: 'Fraunces', serif; font-weight: 700; font-size: 32px; line-height: 1; }
+    .stat-card .value em { font-style: italic; color: var(--red); }
+
+    .panels { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 28px; }
+    .panel { background: var(--cream-soft); border: 1.5px solid var(--ink); padding: 18px; }
+    .panel h2 { font-family: 'Fraunces', serif; font-weight: 700; font-size: 18px; margin: 0 0 14px; }
+    .panel.full { grid-column: 1 / -1; }
+    .panel.empty { color: rgba(26,24,23,0.4); font-style: italic; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid rgba(26,24,23,0.12); }
+    th { font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: rgba(26,24,23,0.6); font-weight: 600; }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .decision-tag { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: 0.18em; padding: 2px 7px; }
+    .decision-tag.pick { background: #C8E8C0; color: #1B5E20; }
+    .decision-tag.wait { background: #F6E2A7; color: #6E4E00; }
+    .decision-tag.drop { background: #F5C9C6; color: #7A1F1B; }
+
+    .bar-row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 12px; padding: 6px 0; border-bottom: 1px solid rgba(26,24,23,0.08); }
+    .bar-row:last-child { border-bottom: none; }
+    .bar-wrap { background: rgba(26,24,23,0.06); height: 6px; margin-top: 4px; position: relative; }
+    .bar-fill { position: absolute; top: 0; left: 0; bottom: 0; background: var(--ink); }
+    .bar-row .name { font-weight: 500; font-size: 13px; }
+    .bar-row .count { font-family: 'Fraunces', serif; font-weight: 700; font-size: 16px; }
+
+    @media (max-width: 900px) {
+      .stat-grid { grid-template-columns: repeat(2, 1fr); }
+      .panels { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">
+      <span class="mark">LM</span>
+      <span class="name">LEGO <em>Scanner</em></span>
+      <span class="admin-tag">ADMIN</span>
+    </a>
+    <nav class="nav">
+      <a href="/">Scanner</a>
+      <a href="/history.html">ประวัติของฉัน</a>
+    </nav>
+  </header>
+
+  <main>
+    <h1>Scan <em>Intelligence</em></h1>
+    <div class="sub">Aggregate ของการสแกนทั้งหมดในระบบ (window: last 5000 scans)</div>
+    <div id="content"><div class="state">กำลังโหลด…</div></div>
+  </main>
+
+  <script>
+    const SESSION_KEY = "lego_session";
+
+    function getSession() {
+      try {
+        const s = JSON.parse(localStorage.getItem(SESSION_KEY) || "null");
+        return s && s.token ? s : null;
+      } catch { return null; }
+    }
+
+    function setState(html, kind) {
+      const cls = kind ? ` ${kind}` : "";
+      document.getElementById("content").innerHTML = `<div class="state${cls}">${html}</div>`;
+    }
+
+    function escapeHTML(s) {
+      return String(s ?? "").replace(/[&<>"']/g, (c) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+      }[c]));
+    }
+
+    function decisionClass(d) {
+      if (!d) return "";
+      if (d === "PICK" || d === "VALIDATED" || d === "SCALE") return "pick";
+      if (d === "WAIT" || d === "RISKY" || d === "TEST") return "wait";
+      return "drop";
+    }
+
+    function fmtDate(iso) {
+      if (!iso) return "";
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return "";
+      return d.toLocaleDateString("th-TH", { month: "short", day: "numeric" }) +
+        " " + d.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
+    }
+
+    function fmtNum(n, digits) {
+      if (n === null || n === undefined || !Number.isFinite(Number(n))) return "—";
+      const x = Number(n);
+      if (digits !== undefined) return x.toFixed(digits);
+      return x.toLocaleString("th-TH");
+    }
+
+    function renderBarList(items, max) {
+      if (!items || !items.length) return '<div class="panel-body empty">ยังไม่มีข้อมูล</div>';
+      const top = Math.max(...items.map(x => x.count), 1);
+      return items.slice(0, max || 10).map((it) => {
+        const pct = Math.round((it.count / top) * 100);
+        return `
+          <div class="bar-row">
+            <div>
+              <div class="name">${escapeHTML(it.name)}</div>
+              <div class="bar-wrap"><div class="bar-fill" style="width:${pct}%"></div></div>
+            </div>
+            <div class="count">${escapeHTML(String(it.count))}</div>
+          </div>`;
+      }).join("");
+    }
+
+    function render(data) {
+      const s = data.stats || {};
+      const recent = data.recent_scans || [];
+      const html = `
+        <div class="stat-grid">
+          <div class="stat-card"><div class="label">Total Scans</div><div class="value">${fmtNum(s.total_scans)}</div></div>
+          <div class="stat-card"><div class="label">Scans Today</div><div class="value"><em>${fmtNum(s.scans_today)}</em></div></div>
+          <div class="stat-card"><div class="label">Active Users</div><div class="value">${fmtNum(s.active_users)}</div></div>
+          <div class="stat-card"><div class="label">Average Score</div><div class="value">${fmtNum(s.average_score, 1)}</div></div>
+        </div>
+
+        <div class="panels">
+          <div class="panel">
+            <h2>Top Categories</h2>
+            ${renderBarList(data.top_categories, 10)}
+          </div>
+          <div class="panel">
+            <h2>Decision Distribution</h2>
+            ${renderBarList(data.decision_distribution, 10)}
+          </div>
+          <div class="panel full">
+            <h2>Most Common Weaknesses</h2>
+            ${renderBarList(data.most_common_weaknesses, 15)}
+          </div>
+          <div class="panel full">
+            <h2>Recent Scans</h2>
+            ${recent.length === 0
+              ? '<div class="panel-body empty">ยังไม่มีการสแกน</div>'
+              : `<table>
+                  <thead>
+                    <tr>
+                      <th>เวลา</th>
+                      <th>User</th>
+                      <th>Product</th>
+                      <th>Category</th>
+                      <th class="num">Score</th>
+                      <th>Decision</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${recent.map(r => `
+                      <tr>
+                        <td>${escapeHTML(fmtDate(r.created_at))}</td>
+                        <td>${escapeHTML(r.user_masked || "—")}</td>
+                        <td>${escapeHTML(r.product_name || "—")}</td>
+                        <td>${escapeHTML(r.category || "—")}</td>
+                        <td class="num">${fmtNum(r.score_total)}${r.score_max ? `/${fmtNum(r.score_max)}` : ""}</td>
+                        <td>${r.decision
+                          ? `<span class="decision-tag ${decisionClass(r.decision)}">${escapeHTML(r.decision)}</span>`
+                          : "—"}</td>
+                      </tr>`).join("")}
+                  </tbody>
+                </table>`}
+          </div>
+        </div>
+      `;
+      document.getElementById("content").innerHTML = html;
+    }
+
+    async function load() {
+      const session = getSession();
+      if (!session) {
+        setState('กรุณาเข้าสู่ระบบก่อน — <a href="/" style="color:var(--red)">ไปหน้า login</a>', "error");
+        return;
+      }
+      try {
+        const r = await fetch("/api/admin-scans", {
+          headers: { "x-session-token": session.token },
+        });
+        if (r.status === 401) {
+          setState('เซสชันหมดอายุ — <a href="/" style="color:var(--red)">เข้าสู่ระบบใหม่</a>', "error");
+          return;
+        }
+        if (r.status === 403) {
+          setState("ไม่มีสิทธิ์เข้าถึง — หน้านี้สำหรับ admin เท่านั้น", "forbidden");
+          return;
+        }
+        if (!r.ok) {
+          setState("โหลดข้อมูลไม่สำเร็จ", "error");
+          return;
+        }
+        const data = await r.json();
+        render(data);
+      } catch (e) {
+        console.error(e);
+        setState("เกิดข้อผิดพลาด", "error");
+      }
+    }
+
+    load();
+  </script>
+</body>
+</html>

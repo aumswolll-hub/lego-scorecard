@@ -3663,8 +3663,36 @@ function saveProduct() {
   // ── FREEMIUM: นับ scan สำเร็จ (+1) ──
   incrementScan();
 
+  // ── Cloud save to Supabase product_scans (Scan History v1) ──
+  // Never blocks the UI: errors are swallowed silently.
+  // Dedupe is handled server-side via (user_email, client_record_id).
+  saveProductScan(record).catch(() => {});
+
   showToast(`บันทึก "${name}" แล้ว — ${record.decision}`);
   // confirm popup removed for cleaner UX
+}
+
+// Saves a completed scan to Supabase via /api/scans-save.
+// Safe-by-design: no throws, no UI blocking, no duplicate guards needed
+// here (server upserts on client_record_id).
+async function saveProductScan(record, screenshotPath) {
+  try {
+    if (!currentSession?.token) return;
+    if (!record || !record.decision) return;
+    await fetch("/api/scans-save", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-session-token": currentSession.token,
+      },
+      body: JSON.stringify({
+        record,
+        screenshotPath: screenshotPath || null,
+      }),
+    });
+  } catch (e) {
+    console.warn("[scans-save] silent fail:", e?.message || e);
+  }
 }
 
 function clearForm() {
