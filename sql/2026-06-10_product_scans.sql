@@ -80,9 +80,15 @@ create index if not exists idx_product_scans_category     on public.product_scan
 create index if not exists idx_product_scans_score        on public.product_scans (score_total);
 
 -- Dedupe: same user + same client_record_id = same save.
-create unique index if not exists ux_product_scans_user_client_record
-  on public.product_scans (user_email, client_record_id)
-  where client_record_id is not null;
+-- Regular unique constraint (not partial) so PostgREST can use it as
+-- an ON CONFLICT target. PG 15+ default = NULLS DISTINCT, so rows with
+-- NULL client_record_id are not treated as duplicates of each other.
+alter table public.product_scans
+  drop constraint if exists ux_product_scans_user_client_record;
+
+alter table public.product_scans
+  add constraint ux_product_scans_user_client_record
+  unique (user_email, client_record_id);
 
 -- ── RLS ─────────────────────────────────────────────────────────
 -- Service role bypasses RLS — that's how /api/scans-* reach this table.
