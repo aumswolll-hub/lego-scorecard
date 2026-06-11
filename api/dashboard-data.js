@@ -128,11 +128,14 @@ export default async function handler(req, res) {
   const enc = encodeURIComponent(email);
 
   try {
-    // Pull this user's scans + tracker rows in parallel.
-    const [scansRes, trackerRes] = await Promise.all([
+    // Pull this user's scans + tracker action layer + LEGACY tracker_items in parallel.
+    // tracker_items = original in-page Tracker tab (pre product_scans). We pull it
+    // so historical records that were never re-saved through scans-save still appear
+    // on the dashboard.
+    const [scansRes, trackerRes, legacyRes] = await Promise.all([
       sbRest(
         `product_scans?user_email=eq.${enc}` +
-        `&select=id,product_name,product_id,shop_name,category,` +
+        `&select=id,client_record_id,product_name,product_id,shop_name,category,` +
         `commission_rate,orders_7d,orders_30d,ctr,atc_7d,atc_30d,stock,` +
         `score_total,score_max,score_pct,decision,strengths,weaknesses,created_at` +
         `&order=created_at.desc&limit=1000`
@@ -143,6 +146,9 @@ export default async function handler(req, res) {
         `is_watchlisted,is_archived,notes,angle_idea,hook_idea,` +
         `posted_count,got_order,order_count,revenue_estimate,last_action_at,updated_at` +
         `&limit=2000`
+      ),
+      sbRest(
+        `tracker_items?email=eq.${enc}&select=id,data&order=id.desc&limit=2000`
       ),
     ]);
 
@@ -156,9 +162,64 @@ export default async function handler(req, res) {
       console.error("[dashboard-data] tracker query failed:", trackerRes.status, t.slice(0, 400));
       return res.status(500).json({ error: "query_failed" });
     }
+    // legacyRes is best-effort — if the table doesn't exist on a fresh install,
+    // we still want the dashboard to load.
+    let legacyRows = [];
+    if (legacyRes.ok) {
+      legacyRows = await legacyRes.json().catch(() => []);
+    } else {
+      console.warn("[dashboard-data] tracker_items unavailable:", legacyRes.status);
+    }
 
     const scans   = await scansRes.json();
     const tracker = await trackerRes.json();
+
+    // ── Merge legacy tracker_items → pseudo-scans ──
+    // Skip any legacy item whose id is already represented in product_scans
+    // (client_record_id is the same Date.now() value the browser used).
+    const knownClientIds = new Set();
+    for (const s of scans) {
+      if (s.client_record_id !== null && s.client_record_id !== undefined) {
+        knownClientIds.add(String(s.client_record_id));
+      }
+    }
+    for (const row of legacyRows) {
+      const d = row && row.data;
+      if (!d || typeof d !== "object") continue;
+      if (d.id !== undefined && d.id !== null && knownClientIds.has(String(d.id))) continue;
+
+      // Coerce the legacy JSON blob into the same shape as a product_scans row.
+      const pseudo = {
+        id: null,                                 // no uuid — pseudo scan
+        client_record_id: d.id ?? null,
+        product_name: d.product || d.product_name || null,
+        product_id:   d.product_id || null,       // legacy has none
+        shop_name:    d.shop_name || null,        // legacy has none
+        category:     d.category  || null,        // legacy has none
+        commission_rate: d.v_commission ?? d.commission ?? null,
+        orders_7d:    d.v_orders7  ?? d.gmv7  ?? null,
+        orders_30d:   d.v_orders30 ?? d.gmv30 ?? null,
+        ctr:          d.v_ctr      ?? null,
+        atc_7d:       d.v_atc7     ?? null,
+        atc_30d:      d.v_atc30    ?? null,
+        stock:        d.v_stock    ?? null,
+        score_total:  d.total      ?? null,
+        score_max:    d.max        ?? null,
+        score_pct:    d.pct        ?? null,
+        decision:     d.decision   ?? null,
+        strengths:    null,
+        weaknesses:   null,
+        created_at:   d.timestamp || (typeof d.id === "number" ? new Date(d.id).toISOString() : null),
+        _legacy:      true,
+      };
+      scans.push(pseudo);
+    }
+    // Re-sort merged list by created_at desc so latestPerKey picks the latest.
+    scans.sort((a, b) => {
+      const ta = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const tb = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return tb - ta;
+    });
 
     const trackerByKey = new Map();
     for (const t of tracker) trackerByKey.set(t.product_key, t);
