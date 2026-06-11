@@ -1,0 +1,478 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dashboard · LEGO SCANNER</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,700;1,500&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --ink: #1A1817; --cream: #F5EFE6; --cream-soft: #FAF6EE;
+      --red: #C8312B; --gold: #C49A4A;
+      --green: #2E7D32; --yellow: #C68B0B;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: 'IBM Plex Sans Thai', sans-serif; background: var(--cream); color: var(--ink); font-size: 15px; line-height: 1.55; -webkit-font-smoothing: antialiased; }
+
+    .topbar { position: sticky; top: 0; background: var(--cream); border-bottom: 1.5px solid var(--ink); padding: 14px 28px; display: flex; align-items: center; justify-content: space-between; z-index: 100; gap: 14px; flex-wrap: wrap; }
+    .brand { display: flex; align-items: center; gap: 12px; text-decoration: none; color: inherit; }
+    .brand .mark { background: var(--ink); color: var(--cream); padding: 5px 9px; font-family: 'Fraunces', serif; font-weight: 700; font-size: 11px; letter-spacing: 0.2em; }
+    .brand .name { font-family: 'Fraunces', serif; font-weight: 700; font-size: 18px; }
+    .brand .name em { font-style: italic; color: var(--red); font-weight: 500; }
+    .nav { display: flex; gap: 18px; align-items: center; }
+    .nav a { color: var(--ink); text-decoration: none; font-size: 13px; font-weight: 500; opacity: 0.7; }
+    .nav a.active { opacity: 1; font-weight: 700; border-bottom: 2px solid var(--red); padding-bottom: 4px; }
+    .nav a:hover { opacity: 1; }
+
+    main { max-width: 1280px; margin: 0 auto; padding: 32px 24px 80px; }
+    h1 { font-family: 'Fraunces', serif; font-weight: 700; font-size: 34px; margin: 0 0 6px; }
+    h1 em { font-style: italic; color: var(--red); font-weight: 500; }
+    .sub { color: rgba(26,24,23,0.65); font-size: 14px; margin-bottom: 28px; }
+
+    .stat-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 26px; }
+    .stat-card { background: var(--cream-soft); border: 1.5px solid var(--ink); padding: 16px; }
+    .stat-card .label { font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: rgba(26,24,23,0.55); font-weight: 600; margin-bottom: 6px; }
+    .stat-card .value { font-family: 'Fraunces', serif; font-weight: 700; font-size: 28px; line-height: 1; }
+    .stat-card.alert .value { color: var(--red); }
+    .stat-card.good  .value { color: var(--green); }
+
+    .panel { background: var(--cream-soft); border: 1.5px solid var(--ink); padding: 20px; margin-bottom: 22px; }
+    .panel h2 { font-family: 'Fraunces', serif; font-weight: 700; font-size: 22px; margin: 0 0 4px; }
+    .panel h2 em { color: var(--red); font-style: italic; font-weight: 500; }
+    .panel .desc { font-size: 13px; color: rgba(26,24,23,0.6); margin-bottom: 14px; }
+
+    .tabs { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+    .tab { background: transparent; border: 1.5px solid var(--ink); padding: 8px 14px; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; color: var(--ink); }
+    .tab.active { background: var(--ink); color: var(--cream); }
+    .tab .count { margin-left: 6px; opacity: 0.7; font-weight: 500; }
+
+    .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+    .pcard { background: var(--cream); border: 1.5px solid var(--ink); padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+    .pcard .name { font-family: 'Fraunces', serif; font-weight: 700; font-size: 15px; line-height: 1.25; }
+    .pcard .row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; }
+    .pcard .score { font-family: 'Fraunces', serif; font-weight: 700; font-size: 18px; }
+    .pcard .score .max { font-size: 10px; opacity: 0.5; }
+    .pcard .meta { color: rgba(26,24,23,0.6); font-size: 11px; }
+    .pcard select { font: inherit; font-size: 12px; padding: 4px 6px; border: 1px solid var(--ink); background: var(--cream-soft); width: 100%; }
+    .pcard button { font: inherit; font-size: 11px; font-weight: 600; padding: 5px 10px; border: 1.5px solid var(--ink); background: var(--ink); color: var(--cream); cursor: pointer; }
+
+    .decision-tag { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: 0.18em; padding: 2px 7px; }
+    .decision-tag.pick { background: #C8E8C0; color: #1B5E20; }
+    .decision-tag.wait { background: #F6E2A7; color: #6E4E00; }
+    .decision-tag.drop { background: #F5C9C6; color: #7A1F1B; }
+
+    .action-tag { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: 0.16em; padding: 2px 7px; border: 1px solid var(--ink); }
+    .action-tag.TEST_NOW       { background: var(--ink); color: var(--cream); }
+    .action-tag.SCALE          { background: var(--green); color: #fff; border-color: var(--green); }
+    .action-tag.WATCHLIST      { background: var(--cream-soft); }
+    .action-tag.DROP           { background: #F5C9C6; }
+    .action-tag.RESCAN_NEEDED  { background: var(--gold); color: #fff; border-color: var(--gold); }
+
+    .controls { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+    .controls .label { font-size: 11px; font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; color: rgba(26,24,23,0.55); }
+    .controls select, .controls input { font: inherit; font-size: 12px; padding: 6px 10px; border: 1.5px solid var(--ink); background: var(--cream); color: var(--ink); }
+
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 12.5px; min-width: 1100px; }
+    th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid rgba(26,24,23,0.12); vertical-align: top; }
+    th { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(26,24,23,0.6); font-weight: 600; background: var(--cream-soft); position: sticky; top: 0; }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    td .pname { font-weight: 600; }
+    td .cat { font-size: 11px; color: rgba(26,24,23,0.6); }
+    td select, td input, td textarea { font: inherit; font-size: 12px; padding: 4px 6px; border: 1px solid var(--ink); background: var(--cream-soft); width: 100%; }
+    td textarea { min-height: 36px; resize: vertical; }
+    td button { font: inherit; font-size: 11px; font-weight: 600; padding: 5px 10px; border: 1.5px solid var(--ink); background: var(--ink); color: var(--cream); cursor: pointer; }
+    td button.saving { opacity: 0.5; }
+    td button.saved   { background: var(--green); border-color: var(--green); }
+
+    .leaks { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+    .leak-card { background: var(--cream); border-left: 4px solid var(--red); border: 1.5px solid var(--ink); border-left: 4px solid var(--red); padding: 14px 16px; font-size: 14px; }
+
+    .state { text-align: center; padding: 60px 20px; color: rgba(26,24,23,0.55); }
+    .state.empty { font-family: 'Fraunces', serif; font-style: italic; font-size: 17px; }
+    .state.error { color: var(--red); font-weight: 600; }
+
+    @media (max-width: 900px) {
+      .stat-grid { grid-template-columns: repeat(3, 1fr); }
+    }
+    @media (max-width: 600px) {
+      .stat-grid { grid-template-columns: repeat(2, 1fr); }
+      main { padding: 24px 14px 64px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">
+      <span class="mark">LM</span>
+      <span class="name">LEGO <em>Scanner</em></span>
+    </a>
+    <nav class="nav">
+      <a href="/">Scanner</a>
+      <a href="/dashboard.html" class="active">Dashboard</a>
+      <a href="/history.html">ประวัติ</a>
+    </nav>
+  </header>
+
+  <main>
+    <h1>LEGO Scanner <em>Dashboard</em></h1>
+    <div class="sub">เปิดหน้านี้แล้วรู้ทันทีว่าวันนี้ควร Test / Scale / Drop สินค้าไหน</div>
+
+    <div id="content"><div class="state">กำลังโหลด…</div></div>
+  </main>
+
+  <script>
+  const SESSION_KEY = "lego_session";
+
+  function getSession() {
+    try {
+      const raw = localStorage.getItem(SESSION_KEY);
+      if (!raw) return null;
+      const s = JSON.parse(raw);
+      if (!s || !s.token) return null;
+      return s;
+    } catch { return null; }
+  }
+
+  function setState(html, kind) {
+    const cls = kind ? ` ${kind}` : "";
+    document.getElementById("content").innerHTML =
+      `<div class="state${cls}">${html}</div>`;
+  }
+
+  function escapeHTML(s) {
+    return String(s ?? "").replace(/[&<>"']/g, (c) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    }[c]));
+  }
+
+  function decisionClass(d) {
+    if (!d) return "";
+    const up = String(d).toUpperCase();
+    if (up === "PICK" || up === "VALIDATED" || up === "SCALE") return "pick";
+    if (up === "WAIT" || up === "RISKY" || up === "TEST") return "wait";
+    return "drop";
+  }
+
+  function fmtDate(iso) {
+    if (!iso) return "—";
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return "—";
+    return d.toLocaleDateString("th-TH", { year: "2-digit", month: "short", day: "numeric" });
+  }
+
+  function fmtNum(n) {
+    if (n === null || n === undefined || n === "") return "—";
+    const v = Number(n);
+    if (!Number.isFinite(v)) return "—";
+    return v.toLocaleString("th-TH", { maximumFractionDigits: 2 });
+  }
+
+  const ACTION_LABELS = {
+    TEST_NOW:      "ควร Test",
+    SCALE:         "ควร Scale",
+    WATCHLIST:     "รอดูต่อ",
+    DROP:          "ควร Drop",
+    RESCAN_NEEDED: "ควรสแกนใหม่",
+  };
+
+  const STATUS_OPTIONS = [
+    "Not Tested", "Testing", "Posted", "Got Order",
+    "No Order", "Scaling", "Dropped",
+  ];
+
+  let DATA = null;
+  let activeTab = "TEST_NOW";
+  let filters = { decision: "ALL", action: "ALL", status: "ALL", category: "ALL", search: "" };
+
+  // ── API ────────────────────────────────────────────────────
+  async function loadDashboard() {
+    const session = getSession();
+    if (!session) {
+      setState('กรุณาเข้าสู่ระบบก่อน — <a href="/" style="color:var(--red)">ไปหน้า login</a>', "error");
+      return;
+    }
+    setState("กำลังโหลด…");
+    try {
+      const r = await fetch("/api/dashboard-data", {
+        headers: { "x-session-token": session.token },
+      });
+      if (r.status === 401) {
+        setState('เซสชันหมดอายุ — <a href="/" style="color:var(--red)">เข้าสู่ระบบใหม่</a>', "error");
+        return;
+      }
+      if (!r.ok) {
+        setState("โหลดข้อมูลไม่สำเร็จ ลองใหม่อีกครั้ง", "error");
+        return;
+      }
+      DATA = await r.json();
+      render();
+    } catch (e) {
+      console.error(e);
+      setState("เกิดข้อผิดพลาด ลองใหม่อีกครั้ง", "error");
+    }
+  }
+
+  async function saveTracker(payload, btn) {
+    const session = getSession();
+    if (!session) return;
+    if (btn) { btn.classList.add("saving"); btn.textContent = "กำลังบันทึก…"; }
+    try {
+      const r = await fetch("/api/tracker-update", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-session-token": session.token,
+        },
+        body: JSON.stringify(payload),
+      });
+      if (!r.ok) throw new Error("save_failed");
+      if (btn) {
+        btn.classList.remove("saving");
+        btn.classList.add("saved");
+        btn.textContent = "✓ บันทึกแล้ว";
+        setTimeout(() => { btn.classList.remove("saved"); btn.textContent = "บันทึกสถานะ"; }, 1500);
+      }
+      return true;
+    } catch (e) {
+      console.error(e);
+      if (btn) { btn.classList.remove("saving"); btn.textContent = "ลองใหม่"; }
+      return false;
+    }
+  }
+
+  // ── Render ─────────────────────────────────────────────────
+  function render() {
+    if (!DATA) return;
+    const { summary, action_groups, products, opportunity_leaks } = DATA;
+
+    const html = `
+      ${renderSummary(summary)}
+      ${renderTodayPanel(action_groups)}
+      ${renderLeaks(opportunity_leaks)}
+      ${renderTable(products)}
+    `;
+    document.getElementById("content").innerHTML = html;
+    bindEvents();
+  }
+
+  function renderSummary(s) {
+    s = s || {};
+    return `
+      <div class="stat-grid">
+        <div class="stat-card"><div class="label">Total Scans</div><div class="value">${s.total_scans || 0}</div></div>
+        <div class="stat-card good"><div class="label">PICK</div><div class="value">${s.pick_count || 0}</div></div>
+        <div class="stat-card"><div class="label">WAIT</div><div class="value">${s.wait_count || 0}</div></div>
+        <div class="stat-card"><div class="label">DROP</div><div class="value">${s.drop_count || 0}</div></div>
+        <div class="stat-card alert"><div class="label">ควรสแกนใหม่</div><div class="value">${s.rescan_needed_count || 0}</div></div>
+        <div class="stat-card alert"><div class="label">Action Gap</div><div class="value">${s.action_gap_count || 0}</div></div>
+      </div>
+    `;
+  }
+
+  function renderTodayPanel(groups) {
+    groups = groups || {};
+    const order = ["TEST_NOW", "SCALE", "WATCHLIST", "DROP", "RESCAN_NEEDED"];
+    const tabs = order.map(k =>
+      `<button class="tab ${k === activeTab ? "active" : ""}" data-tab="${k}">
+        ${ACTION_LABELS[k]} <span class="count">${(groups[k] || []).length}</span>
+      </button>`
+    ).join("");
+
+    const list = groups[activeTab] || [];
+    const cards = list.length
+      ? `<div class="card-grid">${list.map(renderActionCard).join("")}</div>`
+      : `<div class="state empty">ยังไม่มีสินค้าในหมวดนี้</div>`;
+
+    return `
+      <div class="panel">
+        <h2>วันนี้ควรทำ<em>สินค้าไหนก่อน</em></h2>
+        <div class="desc">สลับแท็บเพื่อดูสินค้าที่ระบบแนะนำให้ลงมือทำในแต่ละหมวด</div>
+        <div class="tabs">${tabs}</div>
+        ${cards}
+      </div>
+    `;
+  }
+
+  function renderActionCard(p) {
+    const score = p.score_total ?? "—";
+    const max = p.score_max ?? "";
+    const dec = String(p.decision || "").toUpperCase();
+    const statusOpts = STATUS_OPTIONS.map(s =>
+      `<option value="${escapeHTML(s)}"${(p.user_status || "Not Tested") === s ? " selected" : ""}>${escapeHTML(s)}</option>`
+    ).join("");
+    return `
+      <div class="pcard" data-key="${escapeHTML(p.product_key)}">
+        <div class="name">${escapeHTML(p.product_name || "(ไม่ระบุชื่อ)")}</div>
+        <div class="row">
+          <div class="score">${escapeHTML(String(score))}${max ? `<span class="max">/${escapeHTML(String(max))}</span>` : ""}</div>
+          ${dec ? `<span class="decision-tag ${decisionClass(dec)}">${escapeHTML(dec)}</span>` : ""}
+        </div>
+        <div class="meta">${escapeHTML(p.category || "ไม่ระบุหมวด")} · ${escapeHTML(fmtDate(p.last_scanned_at))}</div>
+        <select class="card-status" data-key="${escapeHTML(p.product_key)}">${statusOpts}</select>
+        <button class="card-save" data-key="${escapeHTML(p.product_key)}" data-scan="${escapeHTML(p.latest_scan_id || "")}">บันทึกสถานะ</button>
+      </div>
+    `;
+  }
+
+  function renderLeaks(leaks) {
+    if (!leaks || !leaks.length) return "";
+    return `
+      <div class="panel">
+        <h2>โอกาส<em>ที่กำลังหลุดมือ</em></h2>
+        <div class="desc">ระบบสรุปจุดที่คุณอาจพลาด — แก้วันนี้ก่อนยอดหลุดเดือนนี้</div>
+        <div class="leaks">
+          ${leaks.map(l => `<div class="leak-card">${escapeHTML(l)}</div>`).join("")}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderTable(products) {
+    products = products || [];
+    const cats = Array.from(new Set(products.map(p => p.category).filter(Boolean))).sort();
+    const decisionOpts = ["ALL","PICK","VALIDATED","SCALE","WAIT","TEST","RISKY","DROP","DEAD"];
+    const actionOpts   = ["ALL","TEST_NOW","SCALE","WATCHLIST","DROP","RESCAN_NEEDED"];
+    const statusOpts   = ["ALL", ...STATUS_OPTIONS];
+
+    const ctlDecision = `<select id="fDecision">${decisionOpts.map(o => `<option value="${o}"${filters.decision===o?" selected":""}>${o}</option>`).join("")}</select>`;
+    const ctlAction   = `<select id="fAction">${actionOpts.map(o => `<option value="${o}"${filters.action===o?" selected":""}>${o === "ALL" ? "ALL" : ACTION_LABELS[o]}</option>`).join("")}</select>`;
+    const ctlStatus   = `<select id="fStatus">${statusOpts.map(o => `<option value="${o}"${filters.status===o?" selected":""}>${o}</option>`).join("")}</select>`;
+    const ctlCat      = `<select id="fCategory"><option value="ALL"${filters.category==="ALL"?" selected":""}>ALL</option>${cats.map(c => `<option value="${escapeHTML(c)}"${filters.category===c?" selected":""}>${escapeHTML(c)}</option>`).join("")}</select>`;
+    const ctlSearch   = `<input id="fSearch" type="search" placeholder="ค้นหาชื่อสินค้า…" value="${escapeHTML(filters.search)}" />`;
+
+    const filtered = products.filter(p => {
+      if (filters.decision !== "ALL" && String(p.decision || "").toUpperCase() !== filters.decision) return false;
+      if (filters.action   !== "ALL" && p.recommended_action !== filters.action) return false;
+      if (filters.status   !== "ALL" && (p.user_status || "Not Tested") !== filters.status) return false;
+      if (filters.category !== "ALL" && (p.category || "") !== filters.category) return false;
+      if (filters.search) {
+        const q = filters.search.toLowerCase();
+        if (!String(p.product_name || "").toLowerCase().includes(q)) return false;
+      }
+      return true;
+    });
+
+    const rows = filtered.map(p => {
+      const dec = String(p.decision || "").toUpperCase();
+      const statusSelect = STATUS_OPTIONS.map(s =>
+        `<option value="${escapeHTML(s)}"${(p.user_status || "Not Tested") === s ? " selected" : ""}>${escapeHTML(s)}</option>`
+      ).join("");
+      return `
+        <tr data-key="${escapeHTML(p.product_key)}" data-scan="${escapeHTML(p.latest_scan_id || "")}">
+          <td>
+            <div class="pname">${escapeHTML(p.product_name || "(ไม่ระบุชื่อ)")}</div>
+            <div class="cat">${escapeHTML(p.shop_name || "")}</div>
+          </td>
+          <td>${escapeHTML(p.category || "—")}</td>
+          <td class="num">${p.score_total ?? "—"}${p.score_max ? `/${p.score_max}` : ""}</td>
+          <td>${dec ? `<span class="decision-tag ${decisionClass(dec)}">${escapeHTML(dec)}</span>` : "—"}</td>
+          <td><span class="action-tag ${p.recommended_action}">${escapeHTML(ACTION_LABELS[p.recommended_action] || p.recommended_action || "—")}</span></td>
+          <td class="num">${fmtNum(p.commission_rate)}</td>
+          <td class="num">${fmtNum(p.orders_7d)}</td>
+          <td class="num">${fmtNum(p.orders_30d)}</td>
+          <td class="num">${fmtNum(p.ctr)}</td>
+          <td class="num">${fmtNum(p.atc_7d)}</td>
+          <td class="num">${fmtNum(p.stock)}</td>
+          <td>${escapeHTML(fmtDate(p.last_scanned_at))}</td>
+          <td><select class="row-status">${statusSelect}</select></td>
+          <td><textarea class="row-notes" placeholder="หมายเหตุ…">${escapeHTML(p.notes || "")}</textarea></td>
+          <td><button class="row-save">บันทึกสถานะ</button></td>
+        </tr>
+      `;
+    }).join("");
+
+    const body = filtered.length
+      ? `<div class="table-wrap"><table>
+          <thead><tr>
+            <th>Product</th><th>Category</th><th class="num">Score</th>
+            <th>Decision</th><th>Recommended</th>
+            <th class="num">Commission</th><th class="num">Orders 7D</th><th class="num">Orders 30D</th>
+            <th class="num">CTR</th><th class="num">ATC 7D</th><th class="num">Stock</th>
+            <th>Last Scanned</th><th>User Status</th><th>หมายเหตุ</th><th></th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table></div>`
+      : `<div class="state empty">ไม่มีสินค้าที่ตรงกับตัวกรอง</div>`;
+
+    return `
+      <div class="panel">
+        <h2>Product <em>Priority</em></h2>
+        <div class="desc">รายการทั้งหมด พร้อม recommended action — อัปเดตสถานะหรือบันทึกความคิดได้ทันที</div>
+        <div class="controls">
+          <span class="label">Decision</span>${ctlDecision}
+          <span class="label">Action</span>${ctlAction}
+          <span class="label">Status</span>${ctlStatus}
+          <span class="label">Category</span>${ctlCat}
+          ${ctlSearch}
+        </div>
+        ${body}
+      </div>
+    `;
+  }
+
+  // ── Events ─────────────────────────────────────────────────
+  function bindEvents() {
+    document.querySelectorAll(".tab[data-tab]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        activeTab = btn.dataset.tab;
+        render();
+      });
+    });
+
+    document.querySelectorAll(".card-save").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const card = btn.closest(".pcard");
+        const key = btn.dataset.key;
+        const scanId = btn.dataset.scan || null;
+        const sel = card.querySelector(".card-status");
+        const ok = await saveTracker({
+          product_key: key,
+          latest_scan_id: scanId || undefined,
+          user_status: sel.value,
+        }, btn);
+        if (ok) reloadSoon();
+      });
+    });
+
+    document.querySelectorAll("tr[data-key] .row-save").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const tr = btn.closest("tr");
+        const key = tr.dataset.key;
+        const scanId = tr.dataset.scan || null;
+        const sel = tr.querySelector(".row-status");
+        const notes = tr.querySelector(".row-notes");
+        const ok = await saveTracker({
+          product_key: key,
+          latest_scan_id: scanId || undefined,
+          user_status: sel.value,
+          notes: notes.value,
+        }, btn);
+        if (ok) reloadSoon();
+      });
+    });
+
+    const fDec = document.getElementById("fDecision");
+    const fAct = document.getElementById("fAction");
+    const fSt  = document.getElementById("fStatus");
+    const fCat = document.getElementById("fCategory");
+    const fSr  = document.getElementById("fSearch");
+    if (fDec) fDec.addEventListener("change", e => { filters.decision = e.target.value; render(); });
+    if (fAct) fAct.addEventListener("change", e => { filters.action   = e.target.value; render(); });
+    if (fSt)  fSt.addEventListener("change",  e => { filters.status   = e.target.value; render(); });
+    if (fCat) fCat.addEventListener("change", e => { filters.category = e.target.value; render(); });
+    if (fSr)  fSr.addEventListener("input",   e => { filters.search   = e.target.value; render(); });
+  }
+
+  let reloadTimer = null;
+  function reloadSoon() {
+    clearTimeout(reloadTimer);
+    reloadTimer = setTimeout(loadDashboard, 800);
+  }
+
+  loadDashboard();
+  </script>
+</body>
+</html>
