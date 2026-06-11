@@ -96,6 +96,54 @@
 
     .pcard .openbtn, td .openbtn { background: transparent; color: var(--ink); border: 1.5px solid var(--ink); }
 
+    /* ── Run Rate panel ── */
+    .runrate { background: var(--ink); color: var(--cream); padding: 24px 26px; margin-bottom: 22px; }
+    .runrate .head { display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; }
+    .runrate h2 { font-family: 'Fraunces', serif; font-weight: 700; font-size: 22px; margin: 0; color: var(--cream); }
+    .runrate h2 em { color: var(--gold); font-style: italic; font-weight: 500; }
+    .runrate .date { font-size: 12px; opacity: 0.7; }
+    .runrate .target-row { display: flex; gap: 10px; align-items: center; font-size: 13px; }
+    .runrate .target-row label { opacity: 0.75; }
+    .runrate .target-row input { font: inherit; font-size: 14px; padding: 7px 10px; border: 1.5px solid var(--cream); background: transparent; color: var(--cream); width: 130px; }
+    .runrate .target-row input::placeholder { color: rgba(245,239,230,0.45); }
+    .runrate .target-row .baht { opacity: 0.7; }
+
+    .runrate .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 18px; }
+    .runrate .kpi { background: rgba(245,239,230,0.06); border: 1px solid rgba(245,239,230,0.2); padding: 14px; }
+    .runrate .kpi .label { font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; opacity: 0.6; font-weight: 600; margin-bottom: 6px; }
+    .runrate .kpi .value { font-family: 'Fraunces', serif; font-weight: 700; font-size: 26px; line-height: 1; color: var(--cream); }
+    .runrate .kpi .value em { font-style: italic; color: var(--gold); }
+    .runrate .kpi .sub { font-size: 11px; opacity: 0.65; margin-top: 4px; }
+    .runrate .kpi.gap.behind .value { color: #FF8E89; }
+    .runrate .kpi.gap.ahead .value  { color: #A6E29A; }
+
+    .runrate .progress-wrap { margin-bottom: 18px; }
+    .runrate .progress-labels { display: flex; justify-content: space-between; font-size: 11px; opacity: 0.65; margin-bottom: 6px; }
+    .runrate .progress-bar { background: rgba(245,239,230,0.12); height: 16px; position: relative; overflow: hidden; }
+    .runrate .progress-bar .actual { position: absolute; top: 0; left: 0; bottom: 0; background: var(--gold); }
+    .runrate .progress-bar .projected { position: absolute; top: 0; left: 0; bottom: 0; background: rgba(196,154,74,0.25); border-right: 2px dashed var(--gold); }
+    .runrate .progress-bar .target-mark { position: absolute; top: -3px; bottom: -3px; right: 0; width: 2px; background: var(--cream); }
+
+    .runrate .actionplan { background: rgba(245,239,230,0.06); border-left: 4px solid var(--gold); padding: 14px 16px; }
+    .runrate .actionplan .title { font-family: 'Fraunces', serif; font-style: italic; font-size: 15px; color: var(--gold); margin-bottom: 6px; }
+    .runrate .actionplan .lead { font-size: 14px; line-height: 1.55; margin-bottom: 10px; }
+    .runrate .actionplan ul { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.7; }
+    .runrate .actionplan li strong { color: var(--gold); }
+    .runrate .actionplan.unset { border-color: rgba(245,239,230,0.3); }
+    .runrate .actionplan.unset .title { color: rgba(245,239,230,0.6); }
+
+    .runrate .toggle-btn { background: transparent; color: var(--cream); border: 1.5px solid var(--cream); padding: 7px 14px; font: inherit; font-size: 12px; cursor: pointer; }
+    .runrate.collapsed .body { display: none; }
+
+    @media (max-width: 900px) {
+      .runrate .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    /* ── Modal: results section ── */
+    .modal .results-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .modal .results-grid .field input[type=number] { width: 100%; }
+    .modal .results-grid .field-check { display: flex; align-items: center; gap: 8px; padding-top: 22px; font-size: 13px; }
+
     /* ── Modal ── */
     .modal-backdrop { position: fixed; inset: 0; background: rgba(26,24,23,0.55); display: none; align-items: flex-start; justify-content: center; z-index: 200; padding: 32px 16px; overflow-y: auto; }
     .modal-backdrop.open { display: flex; }
@@ -285,6 +333,7 @@
     const { summary, action_groups, products, opportunity_leaks } = DATA;
 
     const html = `
+      ${renderRunRate(products, action_groups)}
       ${renderSummary(summary)}
       ${renderTodayPanel(action_groups)}
       ${renderLeaks(opportunity_leaks)}
@@ -292,6 +341,264 @@
     `;
     document.getElementById("content").innerHTML = html;
     bindEvents();
+    bindRunRate();
+  }
+
+  // ── Run Rate ────────────────────────────────────────────────
+  function targetKey() {
+    const s = getSession();
+    return `lego_target_monthly::${(s && s.email) || "anon"}`;
+  }
+  function collapseKey() {
+    const s = getSession();
+    return `lego_runrate_collapsed::${(s && s.email) || "anon"}`;
+  }
+  function getMonthTarget() {
+    try { return Math.max(0, Number(localStorage.getItem(targetKey()) || 0)); }
+    catch { return 0; }
+  }
+  function setMonthTarget(v) {
+    try { localStorage.setItem(targetKey(), String(Math.max(0, Number(v) || 0))); } catch {}
+  }
+  function isRunRateCollapsed() {
+    try { return localStorage.getItem(collapseKey()) === "1"; } catch { return false; }
+  }
+  function setRunRateCollapsed(v) {
+    try { localStorage.setItem(collapseKey(), v ? "1" : "0"); } catch {}
+  }
+
+  function fmtBaht(n) {
+    const v = Number(n || 0);
+    if (!Number.isFinite(v)) return "฿0";
+    return "฿" + Math.round(v).toLocaleString("th-TH");
+  }
+
+  function computeRunRate(products) {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const daysInMonth = monthEnd.getDate();
+    const dayOfMonth  = now.getDate();
+    const daysLeft    = Math.max(0, daysInMonth - dayOfMonth);
+
+    let revenueMTD = 0;
+    let postedMTD  = 0;
+    let ordersMTD  = 0;
+    let productsWithRevenue = 0;
+    let scaleCount = 0, testNowCount = 0;
+
+    for (const p of (products || [])) {
+      const t = p.last_action_at ? new Date(p.last_action_at) : null;
+      const inMonth = t && !isNaN(t.getTime()) && t >= monthStart;
+      if (inMonth) {
+        revenueMTD += Number(p.revenue_estimate || 0);
+        postedMTD  += Number(p.posted_count || 0);
+        ordersMTD  += Number(p.order_count || 0);
+        if (Number(p.revenue_estimate || 0) > 0) productsWithRevenue++;
+      }
+      if (p.recommended_action === "SCALE")    scaleCount++;
+      if (p.recommended_action === "TEST_NOW") testNowCount++;
+    }
+
+    const dailyRate = dayOfMonth > 0 ? revenueMTD / dayOfMonth : 0;
+    const projected = dailyRate * daysInMonth;
+    const target = getMonthTarget();
+    const gapAtEOM = target - projected;
+    const gapToday = target > 0 ? Math.max(0, target - revenueMTD) : 0;
+    const neededPerDay = daysLeft > 0 && gapAtEOM > 0 ? gapAtEOM / daysLeft : 0;
+
+    return {
+      now, daysInMonth, dayOfMonth, daysLeft,
+      revenueMTD, postedMTD, ordersMTD,
+      productsWithRevenue, scaleCount, testNowCount,
+      dailyRate, projected,
+      target, gapAtEOM, gapToday, neededPerDay,
+      progressActual: target > 0 ? Math.min(1, revenueMTD / target) : 0,
+      progressProjected: target > 0 ? Math.min(1, projected / target) : 0,
+    };
+  }
+
+  function avgRevenuePerClip(rr) {
+    if (!rr || !rr.postedMTD) return 0;
+    return rr.revenueMTD / rr.postedMTD;
+  }
+
+  function buildActionPlan(rr) {
+    const target = rr.target;
+    if (!target) {
+      return {
+        title: "ตั้งเป้าค่าคอมเดือนนี้ก่อน",
+        lead: "ระบบยังไม่รู้ว่าคุณอยากได้เท่าไหร่ — กรอกเป้าหมายตรงด้านบน แล้วระบบจะคำนวณ run rate + แผนปฏิบัติให้ทันที",
+        bullets: [],
+        unset: true,
+      };
+    }
+
+    const bullets = [];
+    const avgPerClip = avgRevenuePerClip(rr);
+
+    if (rr.gapAtEOM <= 0) {
+      // On track or ahead
+      const surplus = Math.abs(rr.gapAtEOM);
+      return {
+        title: "Run rate เกินเป้าแล้ว — กดต่อ อย่าผ่อน",
+        lead: `ถ้าโมเมนตัมแบบนี้ จบเดือนจะได้ราว ${fmtBaht(rr.projected)} (เกินเป้า ${fmtBaht(surplus)})`,
+        bullets: [
+          rr.scaleCount > 0
+            ? `<strong>${rr.scaleCount}</strong> สินค้าอยู่ใน Scale — เพิ่มจำนวนคลิป/ความถี่ของตัวที่ทำเงินจริง อย่าเปลี่ยนสินค้า`
+            : `ยังไม่มีสินค้าใน Scale — ตัวที่ได้ออเดอร์แล้วต้องเปลี่ยน status เป็น Got Order/Scaling เพื่อให้ระบบจัดอันดับ`,
+          rr.testNowCount > 0
+            ? `มี <strong>${rr.testNowCount}</strong> สินค้าใน TEST_NOW — ทดสอบเพิ่มเพื่อหา winner ตัวที่ 2/3 ก่อนจบเดือน`
+            : `ลอง scan สินค้าใหม่ ๆ เพื่อ refill pipeline สำหรับเดือนถัดไป`,
+        ],
+        unset: false,
+      };
+    }
+
+    // Behind — generate hard plan
+    bullets.push(
+      `ต้องได้เพิ่ม <strong>${fmtBaht(rr.gapAtEOM)}</strong> ใน <strong>${rr.daysLeft}</strong> วันที่เหลือ → เฉลี่ย <strong>${fmtBaht(rr.neededPerDay)}/วัน</strong>`
+    );
+
+    if (avgPerClip > 0) {
+      const clipsNeeded = Math.ceil(rr.gapAtEOM / avgPerClip);
+      const clipsPerDay = rr.daysLeft > 0 ? Math.ceil(clipsNeeded / rr.daysLeft) : clipsNeeded;
+      bullets.push(
+        `จากสถิติคุณ: คลิป 1 ตัว ≈ <strong>${fmtBaht(avgPerClip)}</strong> → ต้องลงอีก <strong>${clipsNeeded}</strong> คลิป (~<strong>${clipsPerDay}</strong> คลิป/วัน)`
+      );
+    } else {
+      bullets.push(
+        `ยังไม่มีข้อมูลค่าคอมต่อคลิป — กดเข้าไปที่สินค้าที่ลงไปแล้วเพื่ออัปเดต "ผลลัพธ์การโพสต์" ระบบจะคำนวณให้แม่นขึ้น`
+      );
+    }
+
+    if (rr.scaleCount > 0) {
+      bullets.push(
+        `Push หนัก: <strong>${rr.scaleCount}</strong> สินค้าในกลุ่ม Scale — เพิ่มความถี่/ทำคลิป angle ใหม่ของตัวเดิมก่อนหาสินค้าใหม่`
+      );
+    }
+    if (rr.testNowCount > 0) {
+      bullets.push(
+        `ทดสอบ: <strong>${rr.testNowCount}</strong> สินค้าใน TEST_NOW — เริ่มจากตัวคะแนนสูงสุด ลงคลิปแรกภายใน 24 ชม.`
+      );
+    }
+    if (rr.scaleCount === 0 && rr.testNowCount === 0) {
+      bullets.push(
+        `pipeline ว่าง — สแกนสินค้าใหม่ก่อน 5-10 ตัว วันนี้ ไม่งั้นเป้านี้ไปไม่ถึงแน่`
+      );
+    }
+
+    // Brutal truth threshold
+    const gapRatio = rr.gapAtEOM / target;
+    let title, lead;
+    if (gapRatio > 0.5 && rr.daysLeft <= 10) {
+      title = "ห่างเป้าหนักและเวลาน้อย — ต้องตัดสินใจ";
+      lead = `ตอนนี้ run rate จบเดือนจะอยู่ราว ${fmtBaht(rr.projected)} ห่างเป้า ${fmtBaht(rr.gapAtEOM)} (${Math.round(gapRatio*100)}%). ทำต่อแบบเดิมไม่พอ — ต้องเพิ่มจำนวนคลิป/วันแบบขั้นบันได ไม่ใช่หาสินค้าใหม่`;
+    } else if (gapRatio > 0.2) {
+      title = "ตามเป้าได้แต่ต้องเร่งวันนี้";
+      lead = `Run rate ปัจจุบันจบเดือน ${fmtBaht(rr.projected)} ห่างเป้า ${fmtBaht(rr.gapAtEOM)}. ถ้าทำตามแผนด้านล่างทันที ยังไปถึงได้`;
+    } else {
+      title = "เกือบถึงเป้าแล้ว";
+      lead = `ห่างอีก ${fmtBaht(rr.gapAtEOM)} เหลือ ${rr.daysLeft} วัน — เร่งหน่อยจบเดือนนี้ปิดเป้าได้`;
+    }
+
+    return { title, lead, bullets, unset: false };
+  }
+
+  function renderRunRate(products) {
+    const rr = computeRunRate(products);
+    const plan = buildActionPlan(rr);
+    const collapsed = isRunRateCollapsed();
+    const progressActualPct = (rr.progressActual * 100).toFixed(1);
+    const progressProjectedPct = (rr.progressProjected * 100).toFixed(1);
+
+    const gapCls = rr.target === 0 ? "" : (rr.gapAtEOM > 0 ? "behind" : "ahead");
+    const gapValue = rr.target === 0
+      ? "—"
+      : (rr.gapAtEOM > 0 ? `-${fmtBaht(rr.gapAtEOM)}` : `+${fmtBaht(Math.abs(rr.gapAtEOM))}`);
+
+    const dateLabel = `วันที่ ${rr.dayOfMonth} / ${rr.daysInMonth} · เหลืออีก ${rr.daysLeft} วัน`;
+
+    return `
+      <div class="runrate ${collapsed ? "collapsed" : ""}" id="runrateBox">
+        <div class="head">
+          <div>
+            <h2>Run <em>Rate</em> · เป้าหมายเดือนนี้</h2>
+            <div class="date">${escapeHTML(dateLabel)}</div>
+          </div>
+          <div class="target-row">
+            <label for="rrTarget">เป้าค่าคอม/เดือน:</label>
+            <input id="rrTarget" type="number" min="0" step="500" placeholder="เช่น 50000" value="${rr.target || ""}" />
+            <span class="baht">บาท</span>
+            <button class="toggle-btn" id="rrToggle">${collapsed ? "เปิดดู" : "ย่อ"}</button>
+          </div>
+        </div>
+        <div class="body">
+          <div class="kpi-grid">
+            <div class="kpi">
+              <div class="label">ค่าคอมเดือนนี้</div>
+              <div class="value"><em>${fmtBaht(rr.revenueMTD)}</em></div>
+              <div class="sub">${rr.productsWithRevenue} สินค้าที่มีรายได้</div>
+            </div>
+            <div class="kpi">
+              <div class="label">คลิปที่ลงแล้ว</div>
+              <div class="value">${rr.postedMTD}</div>
+              <div class="sub">${rr.ordersMTD} ออเดอร์รวม</div>
+            </div>
+            <div class="kpi">
+              <div class="label">Projected สิ้นเดือน</div>
+              <div class="value">${fmtBaht(rr.projected)}</div>
+              <div class="sub">${fmtBaht(rr.dailyRate)}/วัน</div>
+            </div>
+            <div class="kpi gap ${gapCls}">
+              <div class="label">Gap จากเป้า</div>
+              <div class="value">${gapValue}</div>
+              <div class="sub">${rr.target ? (rr.gapAtEOM > 0 ? `ต้องเร่ง ${fmtBaht(rr.neededPerDay)}/วัน` : "เกินเป้าแล้ว") : "ตั้งเป้าก่อน"}</div>
+            </div>
+          </div>
+
+          ${rr.target > 0 ? `
+          <div class="progress-wrap">
+            <div class="progress-labels">
+              <span>ทำได้จริง ${progressActualPct}% · projected ${progressProjectedPct}%</span>
+              <span>เป้า ${fmtBaht(rr.target)}</span>
+            </div>
+            <div class="progress-bar">
+              <div class="projected" style="width:${Math.min(100, rr.progressProjected*100)}%;"></div>
+              <div class="actual"    style="width:${Math.min(100, rr.progressActual*100)}%;"></div>
+              <div class="target-mark"></div>
+            </div>
+          </div>` : ""}
+
+          <div class="actionplan ${plan.unset ? "unset" : ""}">
+            <div class="title">${escapeHTML(plan.title)}</div>
+            <div class="lead">${plan.lead}</div>
+            ${plan.bullets.length ? `<ul>${plan.bullets.map(b => `<li>${b}</li>`).join("")}</ul>` : ""}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function bindRunRate() {
+    const inp = document.getElementById("rrTarget");
+    const tog = document.getElementById("rrToggle");
+    if (inp) {
+      let t = null;
+      inp.addEventListener("input", () => {
+        clearTimeout(t);
+        t = setTimeout(() => {
+          setMonthTarget(inp.value);
+          render();
+        }, 350);
+      });
+    }
+    if (tog) {
+      tog.addEventListener("click", () => {
+        setRunRateCollapsed(!isRunRateCollapsed());
+        render();
+      });
+    }
   }
 
   function renderSummary(s) {
@@ -723,6 +1030,26 @@
         ${nameField}
         ${fieldHTML}
       </div>
+
+      <div class="section-title">ผลลัพธ์การโพสต์ (ใช้คำนวณ Run Rate)</div>
+      <div class="results-grid">
+        <div class="field">
+          <label>คลิปที่ลงไปแล้ว</label>
+          <input id="res_posted_count" type="number" min="0" step="1" value="${escapeHTML(String(p.posted_count || 0))}" />
+        </div>
+        <div class="field">
+          <label>จำนวนออเดอร์</label>
+          <input id="res_order_count" type="number" min="0" step="1" value="${escapeHTML(String(p.order_count || 0))}" />
+        </div>
+        <div class="field">
+          <label>ค่าคอมที่ได้จริง (บาท)</label>
+          <input id="res_revenue" type="number" min="0" step="1" value="${escapeHTML(String(p.revenue_estimate || 0))}" />
+        </div>
+        <div class="field-check">
+          <input id="res_got_order" type="checkbox" ${p.got_order ? "checked" : ""} />
+          <label for="res_got_order">มีออเดอร์แล้ว</label>
+        </div>
+      </div>
       <div class="score-summary">
         <div>
           <div style="font-size:10px;letter-spacing:0.2em;color:rgba(26,24,23,0.55);font-weight:600;">${modalEditing ? "คะแนนใหม่ (Preview)" : "คะแนน"}</div>
@@ -736,10 +1063,11 @@
       <div id="modalErr" class="err" style="display:none;"></div>
       <div class="actions">
         <button onclick="closeModal()">ปิด</button>
+        <button id="modalResultsBtn" onclick="saveResults()">บันทึกผลลัพธ์</button>
         ${modalEditing
           ? `<button onclick="toggleEdit()">ยกเลิกการแก้ไข</button>
              <button class="primary" id="modalSaveBtn" onclick="saveEditedScan()">บันทึกเป็นข้อมูลใหม่ของสัปดาห์นี้</button>`
-          : `<button class="primary" onclick="toggleEdit()">แก้ไขข้อมูล</button>`
+          : `<button class="primary" onclick="toggleEdit()">แก้ไขตัวเลข Scan</button>`
         }
       </div>
     `;
@@ -763,6 +1091,52 @@
         ${dec ? `<span class="decision-tag ${decCls}" style="font-size:11px;padding:4px 10px;">${escapeHTML(dec)}</span>` : "—"}
       </div>
     `;
+  }
+
+  async function saveResults() {
+    const p = modalProduct;
+    if (!p) return;
+    const session = getSession();
+    if (!session) return;
+
+    const posted   = Number(document.getElementById("res_posted_count").value || 0);
+    const orders   = Number(document.getElementById("res_order_count").value || 0);
+    const revenue  = Number(document.getElementById("res_revenue").value || 0);
+    const gotOrder = !!document.getElementById("res_got_order").checked;
+
+    const btn = document.getElementById("modalResultsBtn");
+    const err = document.getElementById("modalErr");
+    err.style.display = "none";
+    if (btn) { btn.classList.add("saving"); btn.textContent = "กำลังบันทึก…"; }
+
+    try {
+      const r = await fetch("/api/tracker-update", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-session-token": session.token,
+        },
+        body: JSON.stringify({
+          product_key: p.product_key,
+          latest_scan_id: p.latest_scan_id || undefined,
+          posted_count: posted,
+          order_count:  orders,
+          revenue_estimate: revenue,
+          got_order: gotOrder,
+        }),
+      });
+      if (!r.ok) throw new Error("save_failed");
+      if (btn) { btn.classList.remove("saving"); btn.classList.add("saved"); btn.textContent = "✓ บันทึกแล้ว"; }
+      setTimeout(() => {
+        closeModal();
+        loadDashboard();
+      }, 700);
+    } catch (e) {
+      console.error(e);
+      if (btn) { btn.classList.remove("saving"); btn.textContent = "ลองใหม่"; }
+      err.style.display = "block";
+      err.textContent = "บันทึกผลลัพธ์ไม่สำเร็จ";
+    }
   }
 
   async function saveEditedScan() {
