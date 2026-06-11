@@ -135,9 +135,10 @@ export default async function handler(req, res) {
     const [scansRes, trackerRes, legacyRes] = await Promise.all([
       sbRest(
         `product_scans?user_email=eq.${enc}` +
-        `&select=id,client_record_id,product_name,product_id,shop_name,category,` +
+        `&select=id,client_record_id,product_name,product_id,shop_name,category,mode,` +
         `commission_rate,orders_7d,orders_30d,ctr,atc_7d,atc_30d,stock,` +
-        `score_total,score_max,score_pct,decision,strengths,weaknesses,created_at` +
+        `score_total,score_max,score_pct,decision,strengths,weaknesses,` +
+        `raw_scan_result,created_at` +
         `&order=created_at.desc&limit=1000`
       ),
       sbRest(
@@ -192,6 +193,7 @@ export default async function handler(req, res) {
       const pseudo = {
         id: null,                                 // no uuid — pseudo scan
         client_record_id: d.id ?? null,
+        mode:         d.mode || "discovery",
         product_name: d.product || d.product_name || null,
         product_id:   d.product_id || null,       // legacy has none
         shop_name:    d.shop_name || null,        // legacy has none
@@ -209,6 +211,7 @@ export default async function handler(req, res) {
         decision:     d.decision   ?? null,
         strengths:    null,
         weaknesses:   null,
+        raw_scan_result: d,                       // expose raw for the edit modal
         created_at:   d.timestamp || (typeof d.id === "number" ? new Date(d.id).toISOString() : null),
         _legacy:      true,
       };
@@ -235,6 +238,7 @@ export default async function handler(req, res) {
       products.push({
         product_key: key,
         latest_scan_id: scan.id,
+        mode: scan.mode || (scan.raw_scan_result && scan.raw_scan_result.mode) || null,
         product_name: scan.product_name,
         product_id: scan.product_id,
         shop_name: scan.shop_name,
@@ -250,7 +254,11 @@ export default async function handler(req, res) {
         score_max: scan.score_max,
         score_pct: scan.score_pct,
         decision: scan.decision,
+        strengths: scan.strengths || null,
+        weaknesses: scan.weaknesses || null,
+        raw_scan_result: scan.raw_scan_result || null,
         last_scanned_at: scan.created_at,
+        is_legacy: !!scan._legacy,
         recommended_action,
         // tracker (action-layer) fields
         user_status: (t && t.user_status) || "Not Tested",

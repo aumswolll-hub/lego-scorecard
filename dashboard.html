@@ -94,6 +94,38 @@
     .state.empty { font-family: 'Fraunces', serif; font-style: italic; font-size: 17px; }
     .state.error { color: var(--red); font-weight: 600; }
 
+    .pcard .openbtn, td .openbtn { background: transparent; color: var(--ink); border: 1.5px solid var(--ink); }
+
+    /* ── Modal ── */
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(26,24,23,0.55); display: none; align-items: flex-start; justify-content: center; z-index: 200; padding: 32px 16px; overflow-y: auto; }
+    .modal-backdrop.open { display: flex; }
+    .modal { background: var(--cream); border: 1.5px solid var(--ink); max-width: 760px; width: 100%; padding: 24px 26px; position: relative; }
+    .modal h3 { font-family: 'Fraunces', serif; font-weight: 700; font-size: 22px; margin: 0 0 6px; }
+    .modal h3 em { color: var(--red); font-style: italic; font-weight: 500; }
+    .modal .meta { font-size: 12px; color: rgba(26,24,23,0.6); margin-bottom: 16px; }
+    .modal .close { position: absolute; top: 12px; right: 14px; background: transparent; border: none; font-size: 22px; cursor: pointer; color: var(--ink); }
+    .modal .section-title { font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: rgba(26,24,23,0.55); font-weight: 600; margin: 18px 0 8px; }
+    .modal .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .modal .field { display: flex; flex-direction: column; gap: 4px; }
+    .modal .field label { font-size: 11px; font-weight: 600; color: rgba(26,24,23,0.7); }
+    .modal .field .ro { padding: 7px 10px; background: var(--cream-soft); border: 1px solid rgba(26,24,23,0.2); font-size: 13px; min-height: 32px; }
+    .modal .field input { padding: 7px 10px; border: 1.5px solid var(--ink); background: var(--cream-soft); font: inherit; font-size: 13px; }
+    .modal .field input:disabled { background: var(--cream-soft); color: var(--ink); border-color: rgba(26,24,23,0.25); }
+    .modal .legacy-warn { background: #F6E2A7; color: #6E4E00; padding: 10px 12px; font-size: 12px; margin-bottom: 12px; border-left: 4px solid var(--gold); }
+    .modal .score-summary { background: var(--cream-soft); border: 1.5px solid var(--ink); padding: 12px 14px; margin-top: 16px; display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap; }
+    .modal .score-summary .big { font-family: 'Fraunces', serif; font-weight: 700; font-size: 26px; }
+    .modal .score-summary .big .max { font-size: 12px; opacity: 0.5; }
+    .modal .actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; flex-wrap: wrap; }
+    .modal .actions button { font: inherit; font-size: 13px; font-weight: 600; padding: 9px 16px; border: 1.5px solid var(--ink); background: transparent; color: var(--ink); cursor: pointer; }
+    .modal .actions button.primary { background: var(--ink); color: var(--cream); }
+    .modal .actions button.primary.saving { opacity: 0.6; }
+    .modal .actions button.primary.saved { background: var(--green); border-color: var(--green); }
+    .modal .err { color: var(--red); font-size: 12px; margin-top: 8px; }
+
+    @media (max-width: 640px) {
+      .modal .fields { grid-template-columns: 1fr; }
+    }
+
     @media (max-width: 900px) {
       .stat-grid { grid-template-columns: repeat(3, 1fr); }
     }
@@ -122,6 +154,10 @@
 
     <div id="content"><div class="state">กำลังโหลด…</div></div>
   </main>
+
+  <div class="modal-backdrop" id="modalBackdrop" onclick="if(event.target===this)closeModal()">
+    <div class="modal" id="modalBox"></div>
+  </div>
 
   <script>
   const SESSION_KEY = "lego_session";
@@ -312,7 +348,10 @@
         </div>
         <div class="meta">${escapeHTML(p.category || "ไม่ระบุหมวด")} · ${escapeHTML(fmtDate(p.last_scanned_at))}</div>
         <select class="card-status" data-key="${escapeHTML(p.product_key)}">${statusOpts}</select>
-        <button class="card-save" data-key="${escapeHTML(p.product_key)}" data-scan="${escapeHTML(p.latest_scan_id || "")}">บันทึกสถานะ</button>
+        <div style="display:flex;gap:6px;">
+          <button class="card-save" data-key="${escapeHTML(p.product_key)}" data-scan="${escapeHTML(p.latest_scan_id || "")}" style="flex:1;">บันทึกสถานะ</button>
+          <button class="openbtn" onclick="openProductModal('${escapeHTML(p.product_key)}')">ดู / แก้ไข</button>
+        </div>
       </div>
     `;
   }
@@ -379,7 +418,10 @@
           <td>${escapeHTML(fmtDate(p.last_scanned_at))}</td>
           <td><select class="row-status">${statusSelect}</select></td>
           <td><textarea class="row-notes" placeholder="หมายเหตุ…">${escapeHTML(p.notes || "")}</textarea></td>
-          <td><button class="row-save">บันทึกสถานะ</button></td>
+          <td>
+            <button class="row-save">บันทึกสถานะ</button>
+            <button class="openbtn" style="margin-top:4px;" onclick="openProductModal('${escapeHTML(p.product_key)}')">ดู / แก้ไข</button>
+          </td>
         </tr>
       `;
     }).join("");
@@ -471,6 +513,322 @@
     clearTimeout(reloadTimer);
     reloadTimer = setTimeout(loadDashboard, 800);
   }
+
+  // ════════════════════════════════════════════════
+  // Detail / Edit modal
+  // Shows when the product was scanned + every raw field entered.
+  // Edit mode lets the student update the metrics weekly, recomputes
+  // score + decision locally, then POSTs as a NEW scan via /api/scans-save
+  // so the historical trajectory is preserved.
+  // ════════════════════════════════════════════════
+
+  // Validation-mode scoring (ported from index.html)
+  function vScoreCommission(c){ if(c==null||isNaN(c))return null; if(c>=15)return 3; if(c>=10)return 2; if(c>=5)return 1; return 0; }
+  function vScoreOrders(o7,o30){ if(o7==null||o30==null)return null; if(o30===0)return 0; const e=o30*(7/30); const r=o7/e; if(r>=1.2)return 3; if(r>=0.85)return 2; return 1; }
+  function vScoreCTR(ctr){ if(ctr==null)return null; if(ctr>=8)return 3; if(ctr>=4)return 2; return 1; }
+  function vScoreATC(a7,a30){ if(a7==null||a30==null)return null; if(a30===0)return 0; const e=a30*(7/30); const r=a7/e; if(r>=1.0)return 3; if(r>=0.7)return 2; return 1; }
+  function vScoreCVR(o30,a30){ if(o30==null||a30==null||a30===0)return null; const cvr=o30/a30; if(cvr>=0.25)return 3; if(cvr>=0.15)return 2; return 1; }
+  function vScoreStock(stock,o30){ if(stock==null)return null; if(o30==null||o30===0){ if(stock>100)return 2; return 1; } const days=stock/(o30/30); if(days>=14)return 3; if(days>=5)return 2; return 1; }
+  function vScoreOPC(o30,c30){ if(o30==null||c30==null||c30===0)return null; const opc=o30/c30; if(opc>=4.0)return 3; if(opc>=2.0)return 2; return 1; }
+  function vScoreCG(c7,c30){ if(c7==null||c30==null)return null; if(c30===0)return 0; const e=c30*(7/30); const r=c7/e; if(r>=1.0)return 3; if(r>=0.7)return 2; return 1; }
+  function vScoreCreatorCombined(o30,c7,c30){ const a=vScoreOPC(o30,c30); const b=vScoreCG(c7,c30); if(a==null&&b==null)return null; if(a==null)return b; if(b==null)return a; return Math.round((a+b)/2); }
+
+  // Discovery-mode scoring (ported from index.html)
+  function dScoreCommission(c){ if(c==null||isNaN(c))return null; if(c>=20)return 3; if(c>=15)return 2; if(c>=10)return 1; return 0; }
+  function dScoreDemand(d7,d30){ if(d7==null||d30==null)return null; if(d7>0)return 3; if(d7<=0&&d30>0&&Math.abs(d7)/d30<0.2)return 2; return 1; }
+  function dScoreProbability(cr){ if(cr==null)return null; if(cr>=20)return 3; if(cr>=10)return 2; return 1; }
+  function dScoreConcentration(c){ if(c==null)return null; if(c<30)return 3; if(c<=60)return 2; return 1; }
+
+  // Field specs — order + label for each mode
+  const VALIDATION_FIELDS = [
+    { key: "v_commission", label: "Commission %" },
+    { key: "v_orders7",    label: "Orders 7 วัน" },
+    { key: "v_orders30",   label: "Orders 30 วัน" },
+    { key: "v_ctr",        label: "CTR %" },
+    { key: "v_atc7",       label: "ATC 7 วัน" },
+    { key: "v_atc30",      label: "ATC 30 วัน" },
+    { key: "v_creators7",  label: "Creators 7 วัน" },
+    { key: "v_creators30", label: "Creators 30 วัน" },
+    { key: "v_stock",      label: "Stock คงเหลือ" },
+  ];
+  const DISCOVERY_FIELDS = [
+    { key: "commission",   label: "Commission %" },
+    { key: "gmv7",         label: "GMV 7 วัน" },
+    { key: "gmv30",        label: "GMV 30 วัน" },
+    { key: "creators",     label: "Creators" },
+    { key: "cr",           label: "CR %" },
+    { key: "conc",         label: "Concentration %" },
+  ];
+
+  function detectMode(p, raw) {
+    if (p && p.mode === "validation") return "validation";
+    if (p && p.mode === "discovery")  return "discovery";
+    if (raw && raw.mode === "validation") return "validation";
+    if (raw && raw.mode === "discovery")  return "discovery";
+    if (raw && (raw.v_orders7 != null || raw.v_orders30 != null || raw.v_ctr != null)) return "validation";
+    return "discovery";
+  }
+
+  function fieldsForMode(mode) {
+    return mode === "validation" ? VALIDATION_FIELDS : DISCOVERY_FIELDS;
+  }
+
+  // Recompute total/max/pct/decision from the raw inputs.
+  function recompute(mode, raw) {
+    if (mode === "validation") {
+      const comm = num(raw.v_commission);
+      const o7 = num(raw.v_orders7), o30 = num(raw.v_orders30);
+      const ctr = num(raw.v_ctr);
+      const a7 = num(raw.v_atc7), a30 = num(raw.v_atc30);
+      const c7 = num(raw.v_creators7), c30 = num(raw.v_creators30);
+      const stock = num(raw.v_stock);
+      const sComm = vScoreCommission(comm);
+      const sOrd  = vScoreOrders(o7, o30);
+      const sCtr  = vScoreCTR(ctr);
+      const sAtc  = vScoreATC(a7, a30);
+      const sCvr  = vScoreCVR(o30, a30);
+      const sCre  = vScoreCreatorCombined(o30, c7, c30);
+      const sSt   = vScoreStock(stock, o30);
+      const total = (sComm||0)+(sOrd||0)+(sCtr||0)+(sAtc||0)+(sCvr||0)+(sCre||0)+(sSt||0);
+      const max = 21;
+      const pct = total / max;
+      const decision = pct >= 0.74 ? "VALIDATED" : pct >= 0.5 ? "RISKY" : "DEAD";
+      return { total, max, pct, decision };
+    } else {
+      const comm = num(raw.commission);
+      const d7 = num(raw.gmv7), d30 = num(raw.gmv30);
+      const cr = num(raw.cr), conc = num(raw.conc);
+      const sComm = dScoreCommission(comm);
+      const sDem  = dScoreDemand(d7, d30);
+      const sProb = dScoreProbability(cr);
+      const sConc = dScoreConcentration(conc);
+      const angles = Array.isArray(raw.angles) ? raw.angles.filter(Boolean) : [];
+      const sAng  = angles.length === 0 ? null : angles.length >= 3 ? 3 : angles.length === 2 ? 2 : 1;
+      const hasComm = comm !== null;
+      let total = (sDem||0)+(sAng||0)+(sProb||0)+(sConc||0);
+      if (hasComm) total += (sComm||0);
+      const max = hasComm ? 15 : 12;
+      const pct = total / max;
+      const decision = pct >= 0.74 ? "PICK" : pct >= 0.5 ? "WAIT" : "DROP";
+      return { total, max, pct, decision };
+    }
+  }
+
+  function num(v) {
+    if (v === null || v === undefined || v === "") return null;
+    const n = typeof v === "number" ? v : Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  let modalProduct = null;
+  let modalRaw = null;
+  let modalMode = "discovery";
+  let modalEditing = false;
+
+  function openProductModal(productKey) {
+    if (!DATA) return;
+    const p = (DATA.products || []).find(x => x.product_key === productKey);
+    if (!p) return;
+    modalProduct = p;
+    modalRaw = (p.raw_scan_result && typeof p.raw_scan_result === "object")
+      ? JSON.parse(JSON.stringify(p.raw_scan_result))
+      : {};
+    modalMode = detectMode(p, modalRaw);
+    modalEditing = false;
+    renderModal();
+    document.getElementById("modalBackdrop").classList.add("open");
+  }
+
+  function closeModal() {
+    document.getElementById("modalBackdrop").classList.remove("open");
+    modalProduct = null; modalRaw = null; modalEditing = false;
+  }
+
+  function toggleEdit() {
+    modalEditing = !modalEditing;
+    renderModal();
+  }
+
+  function readEditedRaw() {
+    const out = { ...(modalRaw || {}) };
+    fieldsForMode(modalMode).forEach(f => {
+      const el = document.getElementById("edit_" + f.key);
+      if (el) {
+        const v = el.value.trim();
+        out[f.key] = v === "" ? null : Number(v);
+      }
+    });
+    const nm = document.getElementById("edit_product_name");
+    if (nm) out.product = nm.value.trim();
+    return out;
+  }
+
+  function renderModal() {
+    const p = modalProduct;
+    if (!p) return;
+    const fields = fieldsForMode(modalMode);
+    const raw = modalEditing ? readEditedRaw() : modalRaw;
+    const computed = recompute(modalMode, raw);
+    const dec = String(computed.decision || "").toUpperCase();
+    const decCls = decisionClass(dec);
+
+    const legacyWarn = p.is_legacy
+      ? `<div class="legacy-warn">รายการนี้มาจาก Tracker เก่า — ข้อมูลบางอย่างอาจไม่ครบ (เช่น Product ID / Shop) เมื่อบันทึก ระบบจะถือว่าเป็นการสแกนใหม่</div>`
+      : "";
+
+    const fieldHTML = fields.map(f => {
+      const val = raw[f.key];
+      const display = (val === null || val === undefined || val === "") ? "—" : String(val);
+      if (modalEditing) {
+        return `
+          <div class="field">
+            <label>${escapeHTML(f.label)}</label>
+            <input id="edit_${f.key}" type="number" step="any" value="${val == null ? "" : escapeHTML(String(val))}" oninput="onEditChange()" />
+          </div>
+        `;
+      }
+      return `
+        <div class="field">
+          <label>${escapeHTML(f.label)}</label>
+          <div class="ro">${escapeHTML(display)}</div>
+        </div>
+      `;
+    }).join("");
+
+    const nameField = modalEditing
+      ? `<div class="field" style="grid-column:1/-1;">
+           <label>ชื่อสินค้า</label>
+           <input id="edit_product_name" type="text" value="${escapeHTML(raw.product || p.product_name || "")}" />
+         </div>`
+      : "";
+
+    const scannedAt = p.last_scanned_at
+      ? new Date(p.last_scanned_at).toLocaleString("th-TH", {
+          year: "numeric", month: "short", day: "numeric",
+          hour: "2-digit", minute: "2-digit",
+        })
+      : "—";
+
+    document.getElementById("modalBox").innerHTML = `
+      <button class="close" onclick="closeModal()">×</button>
+      <h3>${escapeHTML(p.product_name || "(ไม่ระบุชื่อ)")}<em></em></h3>
+      <div class="meta">
+        สแกนล่าสุด: ${escapeHTML(scannedAt)} · โหมด: ${modalMode === "validation" ? "Validation (TikTok ตัวจริง)" : "Discovery"}
+        ${p.shop_name ? " · ร้าน: " + escapeHTML(p.shop_name) : ""}
+        ${p.category  ? " · หมวด: " + escapeHTML(p.category)  : ""}
+      </div>
+      ${legacyWarn}
+      <div class="section-title">${modalEditing ? "แก้ไขข้อมูลตัวเลข (อัปเดตเป็นค่าใหม่ของสัปดาห์นี้)" : "ข้อมูลที่กรอกตอนสแกน"}</div>
+      <div class="fields">
+        ${nameField}
+        ${fieldHTML}
+      </div>
+      <div class="score-summary">
+        <div>
+          <div style="font-size:10px;letter-spacing:0.2em;color:rgba(26,24,23,0.55);font-weight:600;">${modalEditing ? "คะแนนใหม่ (Preview)" : "คะแนน"}</div>
+          <div class="big">${computed.total}<span class="max">/${computed.max}</span></div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:10px;letter-spacing:0.2em;color:rgba(26,24,23,0.55);font-weight:600;">Decision</div>
+          ${dec ? `<span class="decision-tag ${decCls}" style="font-size:11px;padding:4px 10px;">${escapeHTML(dec)}</span>` : "—"}
+        </div>
+      </div>
+      <div id="modalErr" class="err" style="display:none;"></div>
+      <div class="actions">
+        <button onclick="closeModal()">ปิด</button>
+        ${modalEditing
+          ? `<button onclick="toggleEdit()">ยกเลิกการแก้ไข</button>
+             <button class="primary" id="modalSaveBtn" onclick="saveEditedScan()">บันทึกเป็นข้อมูลใหม่ของสัปดาห์นี้</button>`
+          : `<button class="primary" onclick="toggleEdit()">แก้ไขข้อมูล</button>`
+        }
+      </div>
+    `;
+  }
+
+  function onEditChange() {
+    // Only re-render the score summary so user keeps focus on the input.
+    const raw = readEditedRaw();
+    const c = recompute(modalMode, raw);
+    const dec = String(c.decision || "").toUpperCase();
+    const decCls = decisionClass(dec);
+    const sum = document.querySelector(".score-summary");
+    if (!sum) return;
+    sum.innerHTML = `
+      <div>
+        <div style="font-size:10px;letter-spacing:0.2em;color:rgba(26,24,23,0.55);font-weight:600;">คะแนนใหม่ (Preview)</div>
+        <div class="big">${c.total}<span class="max">/${c.max}</span></div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:10px;letter-spacing:0.2em;color:rgba(26,24,23,0.55);font-weight:600;">Decision</div>
+        ${dec ? `<span class="decision-tag ${decCls}" style="font-size:11px;padding:4px 10px;">${escapeHTML(dec)}</span>` : "—"}
+      </div>
+    `;
+  }
+
+  async function saveEditedScan() {
+    const p = modalProduct;
+    if (!p) return;
+    const session = getSession();
+    if (!session) return;
+
+    const raw = readEditedRaw();
+    const name = (raw.product || p.product_name || "").trim();
+    if (!name) {
+      const err = document.getElementById("modalErr");
+      err.style.display = "block";
+      err.textContent = "ต้องมีชื่อสินค้า";
+      return;
+    }
+    const c = recompute(modalMode, raw);
+
+    // Build a new scan record (same shape the scanner posts to /api/scans-save).
+    const record = {
+      ...raw,
+      id: Date.now(),
+      timestamp: new Date().toISOString(),
+      mode: modalMode,
+      product: name,
+      product_id: p.product_id || raw.product_id || null,
+      shop_name: p.shop_name || raw.shop_name || null,
+      category:  p.category  || raw.category  || null,
+      total: c.total,
+      max: c.max,
+      pct: c.pct,
+      decision: c.decision,
+    };
+
+    const btn = document.getElementById("modalSaveBtn");
+    const err = document.getElementById("modalErr");
+    err.style.display = "none";
+    if (btn) { btn.classList.add("saving"); btn.textContent = "กำลังบันทึก…"; }
+
+    try {
+      const r = await fetch("/api/scans-save", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-session-token": session.token,
+        },
+        body: JSON.stringify({ record }),
+      });
+      if (!r.ok) throw new Error("save_failed");
+
+      if (btn) { btn.classList.remove("saving"); btn.classList.add("saved"); btn.textContent = "✓ บันทึกแล้ว"; }
+      setTimeout(() => {
+        closeModal();
+        loadDashboard();
+      }, 700);
+    } catch (e) {
+      console.error(e);
+      if (btn) { btn.classList.remove("saving"); btn.textContent = "ลองใหม่อีกครั้ง"; }
+      err.style.display = "block";
+      err.textContent = "บันทึกไม่สำเร็จ ลองใหม่อีกครั้ง";
+    }
+  }
+
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape") closeModal();
+  });
 
   loadDashboard();
   </script>
