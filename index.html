@@ -1681,8 +1681,18 @@ body.result-locked .result-block::after {
       <a href="#" onclick="goToUpgrade(event)" class="upsell-result-btn" id="upsellResultBtn">ดู LEGO METHOD →</a>
     </div>
 
+    <style>
+      .save-hint { background: #FFF7E0; border: 1.5px solid var(--gold); padding: 10px 14px; margin-bottom: 12px; font-size: 13px; color: var(--ink); line-height: 1.5; }
+      .save-hint b { color: var(--red); font-weight: 700; }
+      input.field-missing, textarea.field-missing { outline: 2px solid var(--red); outline-offset: 2px; background: #FFF0EF; animation: fieldFlash 0.6s ease-in-out 0s 3; }
+      @keyframes fieldFlash { 0%,100% { background: #FFF0EF; } 50% { background: #FFD6D2; } }
+    </style>
+    <div class="save-hint">
+      💡 <b>ถ้ากดบันทึกแล้วไม่มีอะไรเกิดขึ้น = ยังกรอกไม่ครบ</b><br>
+      ต้องกรอก <u>ชื่อสินค้า</u> + <u>ทุกช่องตัวเลข</u> ใน Scanner ก่อน ระบบจะบอกช่องที่ยังขาดให้
+    </div>
     <div class="actions">
-      <button class="btn btn-primary" id="saveBtn" onclick="saveProduct()" disabled>บันทึกไป Tracker</button>
+      <button class="btn btn-primary" id="saveBtn" onclick="saveProduct()">บันทึกไป Tracker</button>
       <button class="btn btn-secondary" onclick="clearForm()">ล้างข้อมูล</button>
     </div>
       </div><!-- /.scorecard-main -->
@@ -3402,7 +3412,6 @@ function updateValidation() {
     decEl.className = "result-decision empty";
     decTxt.textContent = "กรอกข้อมูลให้ครบเพื่อดูผล";
     msg.textContent = `กรอกแล้ว ${filled}/7 ข้อ • Validation Mode (TikTok App)`;
-    saveBtn.disabled = true;
     document.getElementById("upsellResult").classList.remove("active");
     hideBenchmarkAndPlan();
   } else {
@@ -3456,8 +3465,6 @@ function updateValidation() {
     // x10 value: benchmark + action plan
     renderBenchmark(pct, "validation", decisionVal);
     renderActionPlan(decisionVal, "validation");
-
-    saveBtn.disabled = !document.getElementById("productName").value.trim();
   }
 }
 
@@ -3531,7 +3538,6 @@ function updateDiscovery() {
     decEl.className = "result-decision empty";
     decTxt.textContent = "กรอกข้อมูลให้ครบเพื่อดูผล";
     msg.textContent = `กรอกแล้ว ${filled}/${hasComm ? 5 : 4} ข้อ`;
-    saveBtn.disabled = true;
     document.getElementById("upsellResult").classList.remove("active");
     hideBenchmarkAndPlan();
   } else {
@@ -3585,16 +3591,93 @@ function updateDiscovery() {
     // x10 value: benchmark + action plan
     renderBenchmark(pct, "discovery", decisionVal);
     renderActionPlan(decisionVal, "discovery");
+  }
+}
 
-    saveBtn.disabled = !document.getElementById("productName").value.trim();
+// Returns array of { id, label } for required fields that are empty.
+function getMissingScannerFields() {
+  const missing = [];
+  const nameEl = document.getElementById("productName");
+  if (!nameEl || !nameEl.value.trim()) {
+    missing.push({ id: "productName", label: "ชื่อสินค้า" });
+  }
+
+  if (currentMode === "validation") {
+    const required = [
+      { id: "v_commission",  label: "Commission Rate (%)" },
+      { id: "v_orders7",     label: "Orders — 7 วันล่าสุด" },
+      { id: "v_orders30",    label: "Orders — 30 วันล่าสุด" },
+      { id: "v_ctr",         label: "CTR (%)" },
+      { id: "v_atc7",        label: "ATC — 7 วันล่าสุด" },
+      { id: "v_atc30",       label: "ATC — 30 วันล่าสุด" },
+      { id: "v_creators7",   label: "Creators — 7 วันล่าสุด" },
+      { id: "v_creators30",  label: "Creators — 30 วันล่าสุด" },
+      { id: "v_stock",       label: "Stock คงเหลือ" },
+    ];
+    for (const f of required) {
+      const el = document.getElementById(f.id);
+      if (!el || el.value.trim() === "") missing.push(f);
+    }
+  } else {
+    // Discovery mode
+    const required = [
+      { id: "gmv7",  label: "GMV Growth 7 วัน (%)" },
+      { id: "gmv30", label: "GMV Growth 30 วัน (%)" },
+      { id: "cr",    label: "Creator CR (%)" },
+      { id: "conc",  label: "Sales Concentration (%)" },
+    ];
+    for (const f of required) {
+      const el = document.getElementById(f.id);
+      if (!el || el.value.trim() === "") missing.push(f);
+    }
+    const anglesFilled = ["angle1","angle2","angle3","angle4","angle5"].some((id) => {
+      const el = document.getElementById(id);
+      return el && el.value.trim() !== "";
+    });
+    if (!anglesFilled) missing.push({ id: "angle1", label: "Angle อย่างน้อย 1 ข้อ" });
+  }
+  return missing;
+}
+
+function flagMissingFields(missing) {
+  if (!missing.length) return;
+  const first = document.getElementById(missing[0].id);
+  if (first) {
+    first.scrollIntoView({ behavior: "smooth", block: "center" });
+    setTimeout(() => { try { first.focus({ preventScroll: true }); } catch { first.focus(); } }, 350);
+  }
+  for (const m of missing) {
+    const el = document.getElementById(m.id);
+    if (!el) continue;
+    el.classList.add("field-missing");
+    setTimeout(() => el.classList.remove("field-missing"), 2200);
+  }
+
+  const labels = missing.map(m => "• " + m.label).join("\n");
+  const msgEl = document.getElementById("toastMsg");
+  const toast = document.getElementById("toast");
+  if (msgEl && toast) {
+    msgEl.innerHTML = `<b>ยังกรอกไม่ครบ — กรอกช่องเหล่านี้ก่อน:</b><br>${missing.map(m => "• " + m.label).join("<br>")}`;
+    msgEl.style.whiteSpace = "normal";
+    msgEl.style.textAlign = "left";
+    toast.classList.add("show");
+    setTimeout(() => toast.classList.remove("show"), 4500);
+  } else {
+    alert("ยังกรอกไม่ครบ:\n" + labels);
   }
 }
 
 function saveProduct() {
-  const name = document.getElementById("productName").value.trim();
-  if (!name) { showToast("ใส่ชื่อสินค้าก่อน"); return; }
+  // ── Gate 1: ต้องกรอกครบก่อน ──
+  const missing = getMissingScannerFields();
+  if (missing.length) {
+    flagMissingFields(missing);
+    return;
+  }
 
-  // ── FREEMIUM GATE: เช็คก่อนว่า scan ได้มั้ย ──
+  const name = document.getElementById("productName").value.trim();
+
+  // ── Gate 2: FREEMIUM — เช็คก่อนว่า scan ได้มั้ย ──
   if (usageState && !usageState.can_scan) {
     showPaywall();
     return;
@@ -3987,7 +4070,7 @@ updateAll();
     if (benchmark) benchmark.classList.remove("active");
     if (actionPlan) actionPlan.classList.remove("active");
     if (upsell) upsell.classList.remove("active");
-    if (saveBtn) saveBtn.disabled = true;
+    // saveBtn stays clickable — saveProduct() validates and reports missing fields itself.
   }
 
   if (typeof updateAll === "function" && !window.__legoUpdateAllLocked) {
@@ -4090,12 +4173,16 @@ updateAll();
     if (!btn) return;
 
     btn.textContent = "ดูผลและบันทึก";
-    btn.disabled = !formReady();
+    // Always keep button clickable — saveProduct() handles missing-field feedback.
+    btn.disabled = false;
+    btn.removeAttribute("disabled");
 
-    if (btn.disabled) {
-      btn.title = "กรอกข้อมูลให้ครบก่อนดูผล";
+    if (!formReady()) {
+      btn.title = "กดเพื่อตรวจว่าช่องไหนยังว่าง — ระบบจะบอกให้ครบทุกช่อง";
+      btn.classList.add("btn-incomplete");
     } else {
       btn.title = "กดเพื่อเปิดผลตรวจและบันทึกเข้า Tracker";
+      btn.classList.remove("btn-incomplete");
     }
   }
 
@@ -4186,7 +4273,15 @@ updateAll();
     const oldSaveProduct = saveProduct;
 
     saveProduct = function patchedSaveProduct() {
-      if (!formReady()) {
+      // Detailed missing-field feedback (uses getMissingScannerFields + flagMissingFields)
+      if (typeof getMissingScannerFields === "function" && typeof flagMissingFields === "function") {
+        const missing = getMissingScannerFields();
+        if (missing.length) {
+          flagMissingFields(missing);
+          styleMainCTA();
+          return;
+        }
+      } else if (!formReady()) {
         if (typeof showToast === "function") {
           showToast("กรอกข้อมูลให้ครบก่อนดูผล");
         } else {
