@@ -4554,6 +4554,10 @@ updateAll();
   }
 
   async function bootWithPasswordLoginV2() {
+    // DISABLED 2026-06: superseded by bootFinalAuth (inline login on index — no redirect to /login.html).
+    // bootFinalAuth already covers magic-link token, supabase session, and saved session.
+    return;
+    /* eslint-disable no-unreachable */
     try {
       const urlParams = new URLSearchParams(window.location.search);
       const token = urlParams.get("token");
@@ -4760,6 +4764,10 @@ updateAll();
   }
 
   async function bootWithPasswordLogin() {
+    // DISABLED 2026-06: superseded by bootFinalAuth (inline login on index — no redirect to /login.html).
+    // bootFinalAuth already covers magic-link token, supabase session, and saved session.
+    return;
+    /* eslint-disable no-unreachable */
     try {
       const urlParams = new URLSearchParams(window.location.search);
       const token = urlParams.get("token");
