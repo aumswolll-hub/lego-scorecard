@@ -425,6 +425,16 @@ body { font-family: 'Noto Sans Thai', sans-serif; background: var(--cream); colo
   position: relative;
 }
 .credit-banner.hidden { display: none; }
+/* Existing LEGO METHOD students/admins never see the METHOD upsell anywhere
+   (buttons, banners, modal, result-foot, student-proof gallery inside it). */
+body.lego-method-student #creditBanner,
+body.lego-method-student #dashBanner,
+body.lego-method-student #upgradeOverlay,
+body.lego-method-student #actionPlanFoot,
+body.lego-method-student .upsell-result-btn,
+body.lego-method-student .upsell-btn,
+body.lego-method-student .tracker-upsell-btn,
+body.lego-method-student .af-upsell { display: none !important; }
 .credit-banner.expiring { box-shadow: 4px 4px 0 var(--gold); }
 .credit-banner .credit-gem {
   font-size: 28px;
@@ -1941,6 +1951,17 @@ body.result-locked .result-block::after {
         </div>
       </div>
 
+      <h2 class="serif">นักเรียนที่ใช้<em> ระบบ</em>แล้วเปลี่ยนได้จริง</h2>
+      <p>เคสจริงจากกลุ่ม LEGO METHOD — จาก "เลือกสินค้ามั่ว/สับสน" → เลือกแม่นขึ้นและขายได้จริง</p>
+      <div class="proof-gallery" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:14px; margin:18px 0 30px;">
+        <figure style="margin:0;"><img src="proof/krosk-scanner.jpg" alt="ใช้ Scanner กรองสินค้าง่ายขึ้น" loading="lazy" style="width:100%;display:block;border:1px solid rgba(0,0,0,0.12);border-radius:8px;"><figcaption style="font-size:12px;color:var(--ink-mute);margin-top:6px;line-height:1.45;">ใช้ Scanner อัปโหลดรูป → กรองสินค้าง่ายขึ้น เลือกแม่นขึ้น</figcaption></figure>
+        <figure style="margin:0;"><img src="proof/kai-selection.jpg" alt="เลือกสินค้าง่ายขึ้น" loading="lazy" style="width:100%;display:block;border:1px solid rgba(0,0,0,0.12);border-radius:8px;"><figcaption style="font-size:12px;color:var(--ink-mute);margin-top:6px;line-height:1.45;">ก่อนสับสนเลือกไม่ถูก → ตอนนี้ตัดง่าย เลือกสินค้าง่ายขึ้น</figcaption></figure>
+        <figure style="margin:0;"><img src="proof/xox-selection.jpg" alt="หยิบสินค้ามาก็มั่นใจ" loading="lazy" style="width:100%;display:block;border:1px solid rgba(0,0,0,0.12);border-radius:8px;"><figcaption style="font-size:12px;color:var(--ink-mute);margin-top:6px;line-height:1.45;">ไม่ติดเรื่องเลือกสินค้าแล้ว หยิบมาก็มั่นใจ</figcaption></figure>
+        <figure style="margin:0;"><img src="proof/tomoya-60k.jpg" alt="ได้ 60,000 เปลี่ยนชีวิต" loading="lazy" style="width:100%;display:block;border:1px solid rgba(0,0,0,0.12);border-radius:8px;"><figcaption style="font-size:12px;color:var(--ink-mute);margin-top:6px;line-height:1.45;">เดือนนี้ได้ 60,000 — เปลี่ยนชีวิตเพราะ LEGO</figcaption></figure>
+        <figure style="margin:0;"><img src="proof/macca-lv4.jpg" alt="TikTok Shop Creator Level 4" loading="lazy" style="width:100%;display:block;border:1px solid rgba(0,0,0,0.12);border-radius:8px;"><figcaption style="font-size:12px;color:var(--ink-mute);margin-top:6px;line-height:1.45;">TikTok Shop Creator Level 4 · วันปิด 10k</figcaption></figure>
+        <figure style="margin:0;"><img src="proof/case-44orders.jpg" alt="44 ออเดอร์ลงคลิปวันเดียว" loading="lazy" style="width:100%;display:block;border:1px solid rgba(0,0,0,0.12);border-radius:8px;"><figcaption style="font-size:12px;color:var(--ink-mute);margin-top:6px;line-height:1.45;">44 ออเดอร์ / 5k ลงคลิปวันเดียว</figcaption></figure>
+      </div>
+
       <div class="credit-box" id="modalCreditBox">
         <div class="credit-tag">UPGRADE CREDIT</div>
         <h3 class="serif">เครดิตอัปเกรดของคุณ</h3>
@@ -2282,8 +2303,9 @@ function applyUsageStateToUI() {
     showPaywall();
   }
 
-  // student → ซ่อน hard upsell
-  if (usageState.is_lego_method_student) {
+  // student → ซ่อน hard upsell (รวม upsell buttons/banners/modal/result-foot ทั้งหมด via CSS)
+  if (usageState.is_lego_method_student || usageState.is_admin || usageState.plan === "lego_method" || usageState.plan === "legacy_method" || usageState.plan === "admin") {
+    document.body.classList.add("lego-method-student");
     document.querySelectorAll(".upsell-hide-for-student").forEach(el => el.style.display = "none");
   }
 }
@@ -2621,6 +2643,15 @@ function trackEvent(name, data) {
 // ── Upgrade Modal ──
 function goToUpgrade(e) {
   if (e) e.preventDefault();
+  // SAFETY: existing LEGO METHOD students / admins never see the METHOD upsell
+  // (modal + student proof). Central guard so no trigger can leak it to them.
+  if (usageState && (
+    usageState.is_lego_method_student ||
+    usageState.is_admin ||
+    usageState.plan === "lego_method" ||
+    usageState.plan === "legacy_method" ||
+    usageState.plan === "admin"
+  )) return;
   // Set button href BEFORE showing (prevents href="#" race condition)
   refreshUpgradeButton();
   document.getElementById("upgradeOverlay").classList.add("active");
