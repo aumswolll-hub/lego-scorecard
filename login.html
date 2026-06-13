@@ -138,53 +138,75 @@
       color: #ffffff;
     }
   </style>
+
+  <!-- Brand theme (overrides the dark default above) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,700;9..144,900&family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root { --cream:#F5EFE6; --cream-soft:#FAF6EE; --ink:#0F0F0F; --ink-mute:#6B6B6B; --red:#C8312B; --gold:#C49A4A; --grey-line:#D9D2C5; }
+    body { font-family:'Noto Sans Thai',sans-serif !important; color:var(--ink) !important;
+      background:radial-gradient(ellipse 700px 500px at 18% 12%, rgba(200,49,43,0.06), transparent 60%),
+                 radial-gradient(ellipse 520px 420px at 88% 92%, rgba(196,154,74,0.07), transparent 60%),
+                 var(--cream) !important; }
+    .card { max-width:440px !important; background:var(--cream-soft) !important; border:1.5px solid var(--ink) !important;
+      border-radius:0 !important; box-shadow:8px 8px 0 var(--ink) !important; padding:48px 38px 38px !important; position:relative; }
+    .login-mark { position:absolute; top:-1.5px; left:-1.5px; background:var(--ink); color:var(--cream);
+      padding:8px 14px; font-family:'Fraunces',serif; font-weight:700; font-size:12px; letter-spacing:0.15em; text-transform:uppercase; }
+    .card h1 { font-family:'Fraunces',serif !important; font-weight:900 !important; font-size:42px !important;
+      line-height:0.96 !important; letter-spacing:-0.02em; color:var(--ink) !important; margin:6px 0 6px !important; }
+    .card h1 em { font-style:italic; font-weight:500; color:var(--red); }
+    .card > p { color:var(--ink-mute) !important; font-size:13px !important; margin:0 0 8px !important; }
+    .card label { color:var(--ink) !important; font-size:11px !important; text-transform:uppercase;
+      letter-spacing:0.16em; font-weight:600; margin-top:18px !important; }
+    .card input { background:var(--cream) !important; border:1.5px solid var(--ink) !important; border-radius:0 !important;
+      color:var(--ink) !important; padding:13px 14px !important; font-family:'Noto Sans Thai',sans-serif !important; }
+    .card input:focus { border-color:var(--red) !important; }
+    .card button { border-radius:0 !important; font-family:'Noto Sans Thai',sans-serif !important; }
+    #loginBtn { background:var(--ink) !important; color:var(--cream) !important; font-weight:600 !important;
+      letter-spacing:0.12em; padding:15px !important; margin-top:24px !important; transition:all .15s; }
+    #loginBtn:hover:not(:disabled){ background:var(--red) !important; transform:translate(-2px,-2px); box-shadow:4px 4px 0 var(--ink); }
+    #signupBtn { background:transparent !important; color:var(--ink) !important; border:1.5px solid var(--ink) !important;
+      font-weight:600 !important; margin-top:10px !important; }
+    #signupBtn:hover:not(:disabled){ background:var(--ink) !important; color:var(--cream) !important; }
+    #resetBtn { color:var(--ink-mute) !important; }
+    .message { color:#9a7320 !important; }
+    .message.danger { color:var(--red) !important; }
+    .message.success { color:#1E8E5A !important; }
+    .note-box { background:#FFF8EC !important; border:1px solid var(--gold) !important; border-radius:0 !important;
+      color:var(--ink-mute) !important; }
+    .note-box strong { color:var(--ink) !important; }
+    .small { color:var(--ink-mute) !important; }
+    .steps-row { display:flex; gap:12px; margin:20px 0 6px; }
+    .steps-row > div { flex:1; text-align:center; }
+    .steps-row .n { font-family:'Fraunces',serif; font-weight:900; font-size:22px; color:var(--gold); line-height:1; }
+    .steps-row .t { font-size:11px; color:var(--ink-mute); line-height:1.35; margin-top:5px; }
+  </style>
 </head>
 
 <body>
   <div class="card">
-    <h1>เข้าสู่ระบบ</h1>
+    <div class="login-mark">LEGO METHOD™ · SCANNER</div>
 
-    <p>
-      กรุณาใช้อีเมลเดียวกับที่ใช้ชำระเงินหรือเคยได้รับสิทธิ์ใช้งาน LEGO SCANNER
-    </p>
+    <h1>เข้าสู่<br><em>ระบบ</em></h1>
+    <p>ใช้อีเมลเดียวกับที่ชำระเงิน หรือเคยได้รับสิทธิ์ใช้งาน LEGO SCANNER</p>
 
     <label for="email">อีเมล</label>
-    <input
-      id="email"
-      type="email"
-      placeholder="your@email.com"
-      autocomplete="email"
-    />
+    <input id="email" type="email" placeholder="your@email.com" autocomplete="email" />
 
     <label for="password">รหัสผ่าน</label>
-    <input
-      id="password"
-      type="password"
-      placeholder="อย่างน้อย 6 ตัวอักษร"
-      autocomplete="current-password"
-    />
+    <input id="password" type="password" placeholder="อย่างน้อย 6 ตัวอักษร" autocomplete="current-password" />
 
-    <button id="loginBtn" type="button">เข้าสู่ระบบ</button>
-
-    <button id="signupBtn" type="button" class="secondary">
-      สร้างบัญชี / ตั้งรหัสผ่านครั้งแรก
-    </button>
-
-    <button id="resetBtn" type="button" class="link">
-      ลืมรหัสผ่าน / ตั้งรหัสผ่านใหม่
-    </button>
+    <button id="loginBtn" type="button">เข้าสู่ระบบ →</button>
+    <button id="signupBtn" type="button" class="secondary">ครั้งแรก / ตั้งรหัสผ่าน</button>
+    <button id="resetBtn" type="button" class="link">ลืมรหัสผ่าน?</button>
 
     <div id="message" class="message"></div>
 
     <div class="note-box">
-      <strong>ลูกค้าเก่าที่เคยเข้าใช้งานด้วย Magic Link</strong><br>
-      ให้ใส่อีเมลเดิม + ตั้งรหัสผ่านใหม่อย่างน้อย 6 ตัวอักษร แล้วกด
-      “สร้างบัญชี / ตั้งรหัสผ่านครั้งแรก” ระบบจะตั้งรหัสผ่านให้ทันที
+      <strong>เคยใช้ Magic Link?</strong> ใส่อีเมลเดิม + ตั้งรหัสผ่านใหม่ (อย่างน้อย 6 ตัว) แล้วกด
+      “ครั้งแรก / ตั้งรหัสผ่าน” — ระบบตั้งรหัสให้ทันที
     </div>
-
-    <p class="small">
-      ถ้าเคยสร้างบัญชีแล้ว ให้กด “เข้าสู่ระบบ” หรือ “ลืมรหัสผ่าน / ตั้งรหัสผ่านใหม่”
-    </p>
   </div>
 
   <script>
