@@ -2080,9 +2080,10 @@ const METHOD_PROMO_CODE = "method1990";
 const METHOD_BASE_URL = METHOD_CREDIT_CHECKOUT_URL;
 const METHOD_FULL_PRICE_URL = METHOD_CHECKOUT_URL;
 
-// Scanner FOUNDING PASS (paywall option 1) — one-time, 12-month access via /api/create-checkout
-const SCANNER_PRICE = "5,900"; // baht, one-time — must match the Stripe one-time price (STRIPE_SCANNER_FOUNDING_PRICE_ID)
-const SCANNER_CHECKOUT_URL = "https://buy.stripe.com/5kQ5kE2gM27Kbph5ac9oc0e"; // legacy link (fallback only)
+// Scanner FOUNDING PASS (paywall option 1) — one-time, 12-month access.
+// Sold via a single live Stripe Payment Link (not dynamic Checkout).
+const SCANNER_PRICE = "5,900"; // baht, one-time — matches the Stripe price behind the link
+const SCANNER_CHECKOUT_URL = "https://buy.stripe.com/6oU6oI8FafYA50T5ac9oc0k"; // ฿5,900 Founding Pass
 const METHOD_PRICE_DISPLAY = "8,990";
 const LINE_FALLBACK_URL = ""; // ใส่ LINE URL ถ้ามี (เผื่อ checkout ล่ม)
 
@@ -2634,8 +2635,9 @@ function showPaywall() {
   if (mp) mp.textContent = hasCredit ? "7,000" : METHOD_PRICE_DISPLAY;
 
   if (scannerBtn) {
-    // Subscription goes through /api/create-checkout (handlePaywallScanner), not a static link.
-    scannerBtn.setAttribute("href", "#");
+    // Static Stripe Payment Link; handlePaywallScanner adds prefilled_email on click.
+    scannerBtn.setAttribute("href", SCANNER_CHECKOUT_URL);
+    scannerBtn.setAttribute("target", "_self");
   }
 
   if (methodBtn) {
@@ -2715,42 +2717,17 @@ function closePaywall() {
   document.body.style.overflow = "";
 }
 
-async function handlePaywallScanner(e) {
+function handlePaywallScanner(e) {
   if (e) e.preventDefault();
-  trackEvent("scanner_subscribe_clicked");
+  trackEvent("scanner_pass_link_clicked");
 
-  const btn = document.getElementById("pwScannerBtn");
-  const originalText = btn ? btn.textContent : "";
-  if (btn) { btn.textContent = "กำลังเปิดหน้าชำระเงิน..."; btn.style.pointerEvents = "none"; btn.style.opacity = "0.7"; }
+  // Single live Stripe Payment Link. Prefill the logged-in email so the payment
+  // keys to the right account automatically (Payment Links carry no user_id).
+  let url = SCANNER_CHECKOUT_URL;
+  const email = (window.currentSession && window.currentSession.email) || "";
+  if (email) url += (url.includes("?") ? "&" : "?") + "prefilled_email=" + encodeURIComponent(email);
 
-  try {
-    const token = (window.currentSession && window.currentSession.token) || "";
-    const email = (window.currentSession && window.currentSession.email) || "";
-
-    const res = await fetch("/api/create-checkout", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": "Bearer " + token
-      },
-      body: JSON.stringify({ email })
-    });
-
-    const data = await res.json().catch(() => ({}));
-
-    if (res.ok && data && data.url) {
-      window.location.href = data.url; // Stripe Checkout (subscription)
-      return false;
-    }
-
-    throw new Error((data && data.message) || "checkout_failed");
-  } catch (err) {
-    console.error("[subscribe] error:", err);
-    if (btn) { btn.textContent = originalText; btn.style.pointerEvents = ""; btn.style.opacity = ""; }
-    // Last-resort fallback so a user is never stuck at the paywall.
-    if (SCANNER_CHECKOUT_URL) { window.open(SCANNER_CHECKOUT_URL, "_blank", "noopener"); }
-    else { showToast("เปิดหน้าชำระเงินไม่สำเร็จ กรุณาลองใหม่อีกครั้ง"); }
-  }
+  window.location.href = url; // returns to /?pass=success after payment
   return false;
 }
 
