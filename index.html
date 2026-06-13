@@ -2296,6 +2296,34 @@ async function loadUsageState() {
   }
 }
 
+// After returning from Stripe Checkout (?pass=success). The webhook grants the
+// entitlement asynchronously, so we poll /api/usage a few times until the pass
+// shows up, then confirm. (DoD: "Payment received. We are activating...")
+async function handlePassCheckoutReturn() {
+  const params = new URLSearchParams(window.location.search);
+  const pass = params.get("pass");
+  if (!pass) return;
+  history.replaceState({}, "", window.location.pathname); // clean the URL
+
+  if (pass === "cancel") { showToast("ยกเลิกการชำระเงินแล้ว"); return; }
+  if (pass !== "success") return;
+
+  showToast("ชำระเงินสำเร็จ กำลังเปิดสิทธิ์ใช้งาน...");
+  let tries = 0;
+  const iv = setInterval(async () => {
+    tries++;
+    await loadUsageState();
+    const active = usageState && usageState.scanner_access_ends_at;
+    if (active || tries >= 6) {
+      clearInterval(iv);
+      showToast(active
+        ? "เปิดสิทธิ์ Founding Pass แล้ว ✓ ใช้ได้ 12 เดือน"
+        : "ได้รับการชำระเงินแล้ว กำลังเปิดสิทธิ์ — ลองรีเฟรชอีกครั้ง หากยังไม่ขึ้นทักทีมงานได้เลย");
+    }
+  }, 2500);
+}
+window.addEventListener("load", () => setTimeout(handlePassCheckoutReturn, 1200));
+
 // นับ scan (เรียกเมื่อ scan สำเร็จเท่านั้น)
 async function incrementScan() {
   if (!currentSession?.token) return;
@@ -2364,6 +2392,15 @@ function updateScanCounter() {
 
   if (plan === "lego_method" || state === "lego_method_student" || usageState.is_lego_method_student) {
     el.innerHTML = `<span class="sc-badge student">✦ LEGO METHOD · เหลือ ${left}/${limit} scans</span>`;
+    return;
+  }
+
+  if (usageState.scanner_access_ends_at && (plan === "lego_scanner_founding" || plan === "scanner_pass")) {
+    let dateStr = "";
+    try {
+      dateStr = new Date(usageState.scanner_access_ends_at).toLocaleDateString("th-TH", { year: "numeric", month: "short", day: "numeric" });
+    } catch (e) {}
+    el.innerHTML = `<span class="sc-badge paid">✓ Founding Pass · เหลือ ${left}/${limit}${dateStr ? ` · ถึง ${dateStr}` : ""}</span>`;
     return;
   }
 
