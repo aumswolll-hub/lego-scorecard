@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin · Reconcile | LEGO SCANNER</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,900&family=Noto+Sans+Thai:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --cream:#F5EFE6; --ink:#0F0F0F; --ink-mute:#6B6B6B; --red:#C8312B; --gold:#C49A4A; --line:#D9D2C5; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--cream); color:var(--ink); font-family:'Noto Sans Thai',sans-serif; padding:32px 20px; }
+  .wrap { max-width:1000px; margin:0 auto; }
+  h1 { font-family:'Fraunces',serif; font-weight:900; font-size:32px; margin:0 0 4px; }
+  h1 em { color:var(--red); font-style:italic; }
+  .sub { color:var(--ink-mute); font-size:13px; margin:0 0 24px; }
+  .cards { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:24px; }
+  .card { border:1.5px solid var(--ink); background:#FAF6EE; padding:14px 18px; min-width:130px; }
+  .card .n { font-family:'Fraunces',serif; font-weight:900; font-size:28px; line-height:1; }
+  .card .l { font-size:11px; color:var(--ink-mute); margin-top:4px; letter-spacing:.04em; }
+  .card.warn { border-color:var(--red); } .card.warn .n { color:var(--red); }
+  h2 { font-family:'Fraunces',serif; font-size:18px; margin:28px 0 10px; }
+  table { width:100%; border-collapse:collapse; font-size:12.5px; background:#fff; }
+  th,td { border:1px solid var(--line); padding:7px 9px; text-align:left; }
+  th { background:#efe8da; font-weight:700; }
+  .mono { font-family:ui-monospace,monospace; font-size:11px; }
+  button { font-family:'Noto Sans Thai',sans-serif; cursor:pointer; border:1.5px solid var(--ink); background:var(--ink); color:var(--cream); padding:6px 12px; font-weight:600; }
+  button.sec { background:transparent; color:var(--ink); }
+  .empty { color:var(--ink-mute); font-style:italic; padding:8px 0; }
+  #err { color:var(--red); margin:12px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Reconcile <em>Payments</em></h1>
+  <p class="sub">Stripe Founding-Pass payments cross-checked against entitlements. Unmatched = paid but no access → grant manually.</p>
+  <div id="err"></div>
+  <div class="cards" id="cards"></div>
+  <button class="sec" onclick="load()">↻ Refresh</button>
+
+  <h2>⚠️ Unmatched (paid, no entitlement)</h2>
+  <div id="unmatched"></div>
+
+  <h2>✓ Matched</h2>
+  <div id="matched"></div>
+
+  <h2>Recent entitlements</h2>
+  <div id="ents"></div>
+</div>
+
+<script>
+  const SESSION_KEY = "lego_session";
+  function token() {
+    try { return (JSON.parse(localStorage.getItem(SESSION_KEY) || "null") || {}).token || ""; }
+    catch (e) { return ""; }
+  }
+  function esc(s){ return String(s==null?"":s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
+  function thb(a){ return (Number(a||0)/100).toLocaleString("th-TH"); }
+
+  async function load() {
+    const t = token();
+    if (!t) { document.getElementById("err").textContent = "ไม่พบ session — เข้าสู่ระบบที่ legoscanner.app ด้วยบัญชี admin ก่อน"; return; }
+    document.getElementById("err").textContent = "";
+    let d;
+    try {
+      const r = await fetch("/api/admin-reconcile", { headers: { "x-session-token": t } });
+      d = await r.json();
+      if (!r.ok) { document.getElementById("err").textContent = (d && d.message) || ("HTTP " + r.status); return; }
+    } catch (e) { document.getElementById("err").textContent = String(e); return; }
+
+    const s = d.summary || {};
+    document.getElementById("cards").innerHTML = [
+      ["Stripe payments", s.stripe_founding_payments, ""],
+      ["Entitlements", s.entitlements_total, ""],
+      ["Matched", s.matched, ""],
+      ["Unmatched", s.unmatched, s.unmatched > 0 ? "warn" : ""],
+    ].map(([l,n,c]) => `<div class="card ${c}"><div class="n">${n??"–"}</div><div class="l">${l}</div></div>`).join("")
+      + (s.stripe_error ? `<div class="card warn"><div class="n">!</div><div class="l">Stripe: ${esc(s.stripe_error).slice(0,40)}</div></div>` : "");
+
+    const um = d.unmatched || [];
+    document.getElementById("unmatched").innerHTML = um.length ? table(
+      ["email","payment_intent","amount","created","action"],
+      um.map(r => [esc(r.email), `<span class="mono">${esc(r.payment_intent)}</span>`, thb(r.amount)+" "+esc((r.currency||"").toUpperCase()), esc(r.created).slice(0,10),
+        `<button onclick="grant('${esc(r.email)}','${esc(r.payment_intent)}')">Grant 12mo</button>`])
+    ) : `<div class="empty">ไม่มี — ทุก payment มี entitlement แล้ว ✓</div>`;
+
+    const m = d.matched || [];
+    document.getElementById("matched").innerHTML = m.length ? table(
+      ["email","payment_intent","status","ends_at"],
+      m.map(r => [esc(r.email), `<span class="mono">${esc(r.payment_intent)}</span>`, esc(r.entitlement_status), esc(r.ends_at).slice(0,10)])
+    ) : `<div class="empty">—</div>`;
+
+    const e = d.recent_entitlements || [];
+    document.getElementById("ents").innerHTML = e.length ? table(
+      ["email","status","ends_at","created"],
+      e.map(r => [esc(r.email), esc(r.status), esc(r.ends_at).slice(0,10), esc(r.created_at).slice(0,10)])
+    ) : `<div class="empty">—</div>`;
+  }
+
+  function table(head, rows) {
+    return `<table><thead><tr>${head.map(h=>`<th>${h}</th>`).join("")}</tr></thead><tbody>`
+      + rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join("")}</tr>`).join("") + `</tbody></table>`;
+  }
+
+  async function grant(email, pi) {
+    if (!confirm("Grant a 12-month Founding Pass to " + email + "?")) return;
+    const r = await fetch("/api/admin-reconcile", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-session-token": token() },
+      body: JSON.stringify({ email, payment_intent: pi }),
+    });
+    const d = await r.json();
+    alert(r.ok ? ("Granted ✓ until " + (d.granted && d.granted.endsAt)) : ("Failed: " + (d.message || r.status)));
+    load();
+  }
+
+  load();
+</script>
+</body>
+</html>
