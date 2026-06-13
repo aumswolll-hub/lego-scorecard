@@ -488,6 +488,54 @@ async function handleRefund(event) {
   };
 }
 
+async function emailFromSubscription(sub) {
+  if (sub.metadata && sub.metadata.email) return normalizeEmail(sub.metadata.email);
+  if (sub.customer) return await getEmailFromStripeCustomer(sub.customer);
+  return null;
+}
+
+// Subscription ended (cancelled by user, or after Stripe exhausts dunning
+// retries on failed payments) → revoke entitlement.
+async function handleSubscriptionDeleted(event) {
+  const sub = event.data.object;
+  const email = await emailFromSubscription(sub);
+
+  if (!email) {
+    console.warn("No email found in subscription.deleted:", event.id);
+    return { ok: true, warning: "no_email" };
+  }
+
+  const { error } = await supabase
+    .from("customers")
+    .update({
+      active: false,
+      deactivated_at: new Date().toISOString(),
+      stripe_event_id: event.id,
+    })
+    .eq("email", email);
+
+  if (error) throw error;
+
+  console.log("Customer deactivated from subscription cancel:", email);
+  return { ok: true, email, canceled: true };
+}
+
+// A renewal payment failed. Stripe will retry per the dunning settings, so we
+// do NOT revoke here — only log. Final revocation happens on
+// customer.subscription.deleted once retries are exhausted.
+async function handleInvoicePaymentFailed(event) {
+  const invoice = event.data.object;
+  let email = normalizeEmail(invoice.customer_email);
+  if (!email && invoice.customer) email = await getEmailFromStripeCustomer(invoice.customer);
+
+  console.warn("Subscription renewal payment failed (will retry):", {
+    email: email || "unknown",
+    eventId: event.id,
+  });
+
+  return { ok: true, email, payment_failed: true };
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({
@@ -539,6 +587,14 @@ export default async function handler(req, res) {
 
     else if (event.type === "invoice.payment_succeeded") {
       result = await handleInvoicePaymentSucceeded(event);
+    }
+
+    else if (event.type === "customer.subscription.deleted") {
+      result = await handleSubscriptionDeleted(event);
+    }
+
+    else if (event.type === "invoice.payment_failed") {
+      result = await handleInvoicePaymentFailed(event);
     }
 
     else if (
