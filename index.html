@@ -1886,17 +1886,17 @@ body.result-locked .result-block::after {
     <div class="paywall-options" id="paywallOptions">
       <!-- Option 1: Scanner only -->
       <div class="paywall-card" id="paywallScannerCard">
-        <div class="pc-name">LEGO SCANNER</div>
-        <div class="pc-price"><span id="pwScannerPrice">590</span> บาท<span style="font-size:14px;color:var(--ink-mute);font-weight:400">/เดือน</span></div>
+        <div class="pc-name">LEGO SCANNER · FOUNDING PASS</div>
+        <div class="pc-price"><span id="pwScannerPrice">5,900</span> บาท<span style="font-size:14px;color:var(--ink-mute);font-weight:400"> · ใช้ได้ 12 เดือน</span></div>
         <ul class="pc-benefits">
-          <li>สแกนสินค้าได้ <strong>100 scans/เดือน</strong></li>
+          <li>สแกนสินค้าได้ <strong>300 scans/เดือน</strong></li>
           <li>เห็นคะแนนเต็มทั้ง 7 จุด</li>
           <li>บันทึกประวัติสินค้า + Tracker</li>
           <li>เรียงลำดับสินค้าที่ควรทำก่อน</li>
           <li>ลดความเสี่ยงก่อนเสียเวลาถ่ายคลิป</li>
-          <li>ต่ออายุอัตโนมัติ · <strong>ยกเลิกได้ทุกเมื่อ</strong></li>
+          <li><strong>จ่ายครั้งเดียว</strong> · ใช้ได้ 12 เดือน · ไม่ตัดบัตรอัตโนมัติ</li>
         </ul>
-        <a href="#" id="pwScannerBtn" class="pc-btn pc-btn-secondary" onclick="return handlePaywallScanner(event)">สมัครสมาชิกรายเดือน</a>
+        <a href="#" id="pwScannerBtn" class="pc-btn pc-btn-secondary" onclick="return handlePaywallScanner(event)">ซื้อ Founding Pass (12 เดือน)</a>
       </div>
 
       <!-- Option 2: LEGO METHOD (best value) -->
@@ -2080,9 +2080,9 @@ const METHOD_PROMO_CODE = "method1990";
 const METHOD_BASE_URL = METHOD_CREDIT_CHECKOUT_URL;
 const METHOD_FULL_PRICE_URL = METHOD_CHECKOUT_URL;
 
-// Scanner subscription (paywall option 1) — recurring monthly via /api/create-checkout
-const SCANNER_PRICE = "590"; // baht / month — must match the Stripe recurring price (STRIPE_SCANNER_SUB_PRICE_ID)
-const SCANNER_CHECKOUT_URL = "https://buy.stripe.com/5kQ5kE2gM27Kbph5ac9oc0e"; // legacy one-time link (fallback only)
+// Scanner FOUNDING PASS (paywall option 1) — one-time, 12-month access via /api/create-checkout
+const SCANNER_PRICE = "5,900"; // baht, one-time — must match the Stripe one-time price (STRIPE_SCANNER_FOUNDING_PRICE_ID)
+const SCANNER_CHECKOUT_URL = "https://buy.stripe.com/5kQ5kE2gM27Kbph5ac9oc0e"; // legacy link (fallback only)
 const METHOD_PRICE_DISPLAY = "8,990";
 const LINE_FALLBACK_URL = ""; // ใส่ LINE URL ถ้ามี (เผื่อ checkout ล่ม)
 
