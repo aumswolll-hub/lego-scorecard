@@ -5529,7 +5529,24 @@ updateAll();
         return;
       }
 
-      showAuthSuccess("สร้างบัญชีแล้ว กรุณาเช็ก Email เพื่อยืนยันบัญชี จากนั้นกลับมา Login อีกครั้ง");
+      // Auto-confirm is on, so signUp should return a session. If it doesn't,
+      // sign in immediately with the same credentials — no "check your email" step.
+      const { data: signInData, error: signInError } = await sb.auth.signInWithPassword({
+        email: input.email,
+        password: input.password
+      });
+
+      if (signInData && signInData.session && signInData.session.access_token) {
+        const sessionObj = createSessionObject(input.email, signInData.session.access_token);
+        showAuthSuccess("สร้างบัญชีสำเร็จ กำลังเปิด Scanner...");
+        setTimeout(function() {
+          showAppSafely(sessionObj);
+        }, 400);
+        return;
+      }
+
+      console.error("[auth] signup: no session after signUp+signIn:", signInError);
+      showAuthError("สร้างบัญชีแล้ว แต่เข้าระบบอัตโนมัติไม่สำเร็จ กรุณากด “เข้าสู่ระบบ” อีกครั้ง");
     } catch (err) {
       console.error("[auth] signup error:", err);
       showAuthError("สร้างบัญชีไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
