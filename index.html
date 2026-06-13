@@ -1429,13 +1429,27 @@ body.result-locked .result-block::after {
     <div class="login-mark">LEGO METHOD™ · SCANNER</div>
 
     <h1 class="serif">สินค้านี้<br><em>น่าทำไหม?</em></h1>
-    <p class="sub">อัปโหลดภาพจาก TikTok Shop → AI อ่านตัวเลขให้ → รู้ใน 10 วินาทีว่าควร <strong style="color:var(--ink)">ทำ / ลองก่อน / ข้าม</strong></p>
+    <p class="sub">อัปโหลดภาพ Promotion Info จาก TikTok Shop → AI อ่านตัวเลขให้ → รู้ใน 10 วินาทีว่าควร <strong style="color:var(--ink)">ทำ / ลองก่อน / ข้าม</strong></p>
+
+    <!-- สิ่งที่คุณจะได้ (ผลลัพธ์) -->
+    <div style="display:flex; gap:8px; margin:0 0 28px;">
+      <span style="flex:1; text-align:center; border:1.5px solid #1E8E5A; color:#1E8E5A; font-weight:600; font-size:13px; padding:9px 4px;">● ทำเลย</span>
+      <span style="flex:1; text-align:center; border:1.5px solid var(--gold); color:#9a7320; font-weight:600; font-size:13px; padding:9px 4px;">● ลองก่อน</span>
+      <span style="flex:1; text-align:center; border:1.5px solid var(--red); color:var(--red); font-weight:600; font-size:13px; padding:9px 4px;">● ข้ามก่อน</span>
+    </div>
+
+    <!-- 3 ขั้นตอน -->
+    <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:32px;">
+      <div style="text-align:center;"><div style="font-family:'Fraunces',serif; font-weight:900; font-size:26px; color:var(--gold); line-height:1;">1</div><div style="font-size:12px; color:var(--ink-mute); line-height:1.4; margin-top:6px;">สมัครฟรี<br>ด้วยอีเมล</div></div>
+      <div style="text-align:center;"><div style="font-family:'Fraunces',serif; font-weight:900; font-size:26px; color:var(--gold); line-height:1;">2</div><div style="font-size:12px; color:var(--ink-mute); line-height:1.4; margin-top:6px;">อัปโหลดภาพ<br>สินค้า 2 รูป</div></div>
+      <div style="text-align:center;"><div style="font-family:'Fraunces',serif; font-weight:900; font-size:26px; color:var(--gold); line-height:1;">3</div><div style="font-size:12px; color:var(--ink-mute); line-height:1.4; margin-top:6px;">รู้คะแนน<br>+ คำแนะนำ</div></div>
+    </div>
 
     <label class="field-label" for="emailInput">อีเมล</label>
     <input type="email" id="emailInput" placeholder="you@example.com" autocomplete="email">
 
     <label class="field-label" for="passwordInput" style="margin-top:18px;">รหัสผ่าน</label>
-    <input type="password" id="passwordInput" placeholder="อย่างน้อย 6 ตัวอักษร" autocomplete="current-password">
+    <input type="password" id="passwordInput" placeholder="ตั้งรหัสผ่านอย่างน้อย 6 ตัวอักษร" autocomplete="current-password">
 
     <div class="login-error" id="loginError"></div>
     <div class="login-success" id="loginSuccess"></div>
@@ -1444,10 +1458,9 @@ body.result-locked .result-block::after {
     <button class="login-btn lego-auth-secondary-btn" id="loginBtn" type="button" onclick="loginWithPassword()">เข้าสู่ระบบ (ลูกค้าเก่า)</button>
     <button class="login-btn lego-auth-link-btn" id="resetBtn" type="button" onclick="resetPasswordFromIndex()">ลืมรหัสผ่าน / ตั้งรหัสผ่านใหม่</button>
 
-    <div class="lego-free-note">
-      <strong>ฟรี 3 ครั้ง</strong> · ไม่ต้องผูกบัตร · ใช้ข้อมูลจริงจาก TikTok Shop<br>
-      เคยใช้ Magic Link หรือซื้อ Scanner / LEGO METHOD แล้ว — ใส่อีเมลเดิม กด “เข้าสู่ระบบ” (ยังไม่มีรหัสผ่าน กด “ลืมรหัสผ่าน” เพื่อตั้งใหม่) ระบบปลดล็อกสิทธิ์ให้อัตโนมัติ
-    </div>
+    <p style="text-align:center; font-size:12px; color:var(--ink-mute); margin:18px 0 0;">นักเรียน LEGO METHOD ใช้เลือกสินค้าแม่นขึ้นทุกวัน</p>
+
+    <p class="hint"><strong>ฟรี 3 ครั้ง</strong> · ไม่ต้องผูกบัตร · ใช้ข้อมูลจริงจาก TikTok Shop<br>ลูกค้าเก่า / เคยใช้ Magic Link — ใส่อีเมลเดิม กด “เข้าสู่ระบบ” (ยังไม่มีรหัสผ่าน กด “ลืมรหัสผ่าน” เพื่อตั้งใหม่) ระบบปลดล็อกสิทธิ์ให้อัตโนมัติ</p>
   </div>
 </div>
 
@@ -5370,13 +5383,25 @@ updateAll();
       <div class="login-mark">LEGO METHOD™ · SCANNER</div>
 
       <h1 class="serif">สินค้านี้<br><em>น่าทำไหม?</em></h1>
-      <p class="sub">อัปโหลดภาพจาก TikTok Shop → AI อ่านตัวเลขให้ → รู้ใน 10 วินาทีว่าควร <strong style="color:var(--ink)">ทำ / ลองก่อน / ข้าม</strong></p>
+      <p class="sub">อัปโหลดภาพ Promotion Info จาก TikTok Shop → AI อ่านตัวเลขให้ → รู้ใน 10 วินาทีว่าควร <strong style="color:var(--ink)">ทำ / ลองก่อน / ข้าม</strong></p>
+
+      <div style="display:flex; gap:8px; margin:0 0 28px;">
+        <span style="flex:1; text-align:center; border:1.5px solid #1E8E5A; color:#1E8E5A; font-weight:600; font-size:13px; padding:9px 4px;">● ทำเลย</span>
+        <span style="flex:1; text-align:center; border:1.5px solid var(--gold); color:#9a7320; font-weight:600; font-size:13px; padding:9px 4px;">● ลองก่อน</span>
+        <span style="flex:1; text-align:center; border:1.5px solid var(--red); color:var(--red); font-weight:600; font-size:13px; padding:9px 4px;">● ข้ามก่อน</span>
+      </div>
+
+      <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:32px;">
+        <div style="text-align:center;"><div style="font-family:'Fraunces',serif; font-weight:900; font-size:26px; color:var(--gold); line-height:1;">1</div><div style="font-size:12px; color:var(--ink-mute); line-height:1.4; margin-top:6px;">สมัครฟรี<br>ด้วยอีเมล</div></div>
+        <div style="text-align:center;"><div style="font-family:'Fraunces',serif; font-weight:900; font-size:26px; color:var(--gold); line-height:1;">2</div><div style="font-size:12px; color:var(--ink-mute); line-height:1.4; margin-top:6px;">อัปโหลดภาพ<br>สินค้า 2 รูป</div></div>
+        <div style="text-align:center;"><div style="font-family:'Fraunces',serif; font-weight:900; font-size:26px; color:var(--gold); line-height:1;">3</div><div style="font-size:12px; color:var(--ink-mute); line-height:1.4; margin-top:6px;">รู้คะแนน<br>+ คำแนะนำ</div></div>
+      </div>
 
       <label class="field-label" for="emailInput">อีเมล</label>
       <input type="email" id="emailInput" placeholder="you@example.com" autocomplete="email">
 
       <label class="field-label" for="passwordInput" style="margin-top:18px;">รหัสผ่าน</label>
-      <input type="password" id="passwordInput" placeholder="อย่างน้อย 6 ตัวอักษร" autocomplete="current-password">
+      <input type="password" id="passwordInput" placeholder="ตั้งรหัสผ่านอย่างน้อย 6 ตัวอักษร" autocomplete="current-password">
 
       <div class="login-error" id="loginError"></div>
       <div class="login-success" id="loginSuccess"></div>
@@ -5385,10 +5410,9 @@ updateAll();
       <button class="login-btn lego-auth-secondary-btn" id="loginBtn" type="button" onclick="loginWithPassword()">เข้าสู่ระบบ (ลูกค้าเก่า)</button>
       <button class="login-btn lego-auth-link-btn" id="resetBtn" type="button" onclick="resetPasswordFromIndex()">ลืมรหัสผ่าน / ตั้งรหัสผ่านใหม่</button>
 
-      <div class="lego-free-note">
-        <strong>ฟรี 3 ครั้ง</strong> · ไม่ต้องผูกบัตร · ใช้ข้อมูลจริงจาก TikTok Shop<br>
-        เคยใช้ Magic Link หรือซื้อ Scanner / LEGO METHOD แล้ว — ใส่อีเมลเดิม กด “เข้าสู่ระบบ” (ยังไม่มีรหัสผ่าน กด “ลืมรหัสผ่าน” เพื่อตั้งใหม่) ระบบปลดล็อกสิทธิ์ให้อัตโนมัติ
-      </div>
+      <p style="text-align:center; font-size:12px; color:var(--ink-mute); margin:18px 0 0;">นักเรียน LEGO METHOD ใช้เลือกสินค้าแม่นขึ้นทุกวัน</p>
+
+      <p class="hint"><strong>ฟรี 3 ครั้ง</strong> · ไม่ต้องผูกบัตร · ใช้ข้อมูลจริงจาก TikTok Shop<br>ลูกค้าเก่า / เคยใช้ Magic Link — ใส่อีเมลเดิม กด “เข้าสู่ระบบ” (ยังไม่มีรหัสผ่าน กด “ลืมรหัสผ่าน” เพื่อตั้งใหม่) ระบบปลดล็อกสิทธิ์ให้อัตโนมัติ</p>
     `;
 
     const emailInput = $("emailInput");
