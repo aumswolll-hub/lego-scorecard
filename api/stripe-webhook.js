@@ -12,6 +12,12 @@
 
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
+import {
+  recordStripeEvent,
+  grantScannerPass,
+  refundScannerPassByPaymentIntent,
+  getPlan,
+} from "./_entitlements.js";
 
 export const config = {
   api: {
@@ -25,6 +31,13 @@ const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
+
+// ── LEGO SCANNER FOUNDING PASS (one-time, 12 months) ──
+// Price ID is the source of truth; metadata.plan_code is the primary signal
+// from our own Checkout. New paid Scanner access flows to user_entitlements,
+// NOT to the legacy customers table.
+const FOUNDING_PRICE_ID = process.env.STRIPE_SCANNER_FOUNDING_PRICE_ID || "";
+const FOUNDING_PLAN_CODE = "lego_scanner_founding";
 
 // Optional env for exact Payment Link matching
 // Put Stripe payment_link IDs here if you have them, e.g. plink_xxx
@@ -315,6 +328,18 @@ async function handleCheckoutSessionCompleted(event) {
     };
   }
 
+  // Founding Pass → new entitlement layer (does NOT write the legacy customers table).
+  if (metadataSaysFounding(session) || (await sessionHasFoundingPrice(session))) {
+    return await grantFoundingPass({
+      obj: session,
+      email,
+      stripeCustomerId: session.customer || null,
+      checkoutSessionId: session.id,
+      paymentIntentId: session.payment_intent || null,
+      priceId: FOUNDING_PRICE_ID || null,
+    });
+  }
+
   const plan = await resolveCheckoutPlan(session);
 
   const payload = await upsertCustomerEntitlement({
@@ -357,6 +382,18 @@ async function handlePaymentIntentSucceeded(event) {
       ok: true,
       warning: "no_email",
     };
+  }
+
+  // Founding Pass → new entitlement layer (idempotent via unique payment_intent).
+  if (metadataSaysFounding(intent)) {
+    return await grantFoundingPass({
+      obj: intent,
+      email,
+      stripeCustomerId: intent.customer || null,
+      checkoutSessionId: null,
+      paymentIntentId: intent.id,
+      priceId: FOUNDING_PRICE_ID || null,
+    });
   }
 
   const metadata = intent.metadata || {};
@@ -452,7 +489,20 @@ async function handleInvoicePaymentSucceeded(event) {
 
 async function handleRefund(event) {
   const charge = event.data.object;
+  const paymentIntentId = charge.payment_intent || null;
 
+  // 1) If this refund maps to a Founding Pass, revoke ONLY that entitlement row.
+  //    Never touch customers → LEGO METHOD / admin / legacy access is preserved.
+  if (paymentIntentId) {
+    const r = await refundScannerPassByPaymentIntent(paymentIntentId);
+    if (r.matched) {
+      console.log("Founding pass refunded (entitlement only):", paymentIntentId);
+      return { ok: true, refunded: true, scope: "scanner_pass" };
+    }
+  }
+
+  // 2) Otherwise this is a legacy one-time purchase (scanner_paid / method) that
+  //    lives in customers — keep the existing behavior for those.
   const email = normalizeEmail(
     charge.billing_details?.email ||
       charge.receipt_email
@@ -479,60 +529,64 @@ async function handleRefund(event) {
     throw error;
   }
 
-  console.log("Customer deactivated from refund:", email);
+  console.log("Customer deactivated from refund (legacy):", email);
 
   return {
     ok: true,
     email,
     refunded: true,
+    scope: "legacy_customer",
   };
 }
 
-async function emailFromSubscription(sub) {
-  if (sub.metadata && sub.metadata.email) return normalizeEmail(sub.metadata.email);
-  if (sub.customer) return await getEmailFromStripeCustomer(sub.customer);
-  return null;
+// ── LEGO SCANNER FOUNDING PASS (one-time) ───────────────────────
+
+// Is this object (session or payment_intent) a Founding Pass purchase?
+// Price ID is the source of truth; metadata.plan_code is the primary signal
+// from our own Checkout. We never identify the pass by amount.
+function metadataSaysFounding(obj) {
+  const m = (obj && obj.metadata) || {};
+  const code = String(m.plan_code || m.plan || "").toLowerCase();
+  return code === FOUNDING_PLAN_CODE || code.includes("scanner_founding");
 }
 
-// Subscription ended (cancelled by user, or after Stripe exhausts dunning
-// retries on failed payments) → revoke entitlement.
-async function handleSubscriptionDeleted(event) {
-  const sub = event.data.object;
-  const email = await emailFromSubscription(sub);
-
-  if (!email) {
-    console.warn("No email found in subscription.deleted:", event.id);
-    return { ok: true, warning: "no_email" };
-  }
-
-  const { error } = await supabase
-    .from("customers")
-    .update({
-      active: false,
-      deactivated_at: new Date().toISOString(),
-      stripe_event_id: event.id,
-    })
-    .eq("email", email);
-
-  if (error) throw error;
-
-  console.log("Customer deactivated from subscription cancel:", email);
-  return { ok: true, email, canceled: true };
+async function sessionHasFoundingPrice(session) {
+  if (!FOUNDING_PRICE_ID) return false;
+  const items = await getCheckoutLineItems(session.id);
+  return items.some((it) => it.price && it.price.id === FOUNDING_PRICE_ID);
 }
 
-// A renewal payment failed. Stripe will retry per the dunning settings, so we
-// do NOT revoke here — only log. Final revocation happens on
-// customer.subscription.deleted once retries are exhausted.
-async function handleInvoicePaymentFailed(event) {
-  const invoice = event.data.object;
-  let email = normalizeEmail(invoice.customer_email);
-  if (!email && invoice.customer) email = await getEmailFromStripeCustomer(invoice.customer);
+// Safe user matching: metadata.user_id → client_reference_id → email fallback.
+function resolveGrantIdentity(obj, email) {
+  const m = (obj && obj.metadata) || {};
+  const userId = m.user_id || obj.client_reference_id || null;
+  return { userId: userId && /^[0-9a-f-]{36}$/i.test(userId) ? userId : null, email };
+}
 
-  console.warn("Subscription renewal payment failed (will retry):", {
-    email: email || "unknown",
-    eventId: event.id,
+async function grantFoundingPass({ obj, email, stripeCustomerId, checkoutSessionId, paymentIntentId, priceId }) {
+  const plan = (await getPlan(FOUNDING_PLAN_CODE)) || {};
+  const { userId } = resolveGrantIdentity(obj, email);
+
+  const result = await grantScannerPass({
+    email,
+    userId,
+    planCode: FOUNDING_PLAN_CODE,
+    accessDurationDays: Number(plan.access_duration_days || 365),
+    stripeCustomerId: stripeCustomerId || null,
+    stripeCheckoutSessionId: checkoutSessionId || null,
+    stripePaymentIntentId: paymentIntentId || null,
+    stripePriceId: priceId || FOUNDING_PRICE_ID || null,
   });
 
+  return { ok: true, pass: true, email, endsAt: result.endsAt, duplicate: result.duplicate };
+}
+
+// One-time payment failed — log a recoverable state, never grant.
+async function handlePaymentIntentFailed(event) {
+  const intent = event.data.object;
+  let email = normalizeEmail(intent.receipt_email);
+  if (!email && intent.customer) email = await getEmailFromStripeCustomer(intent.customer);
+  console.warn("One-time payment failed:", { email: email || "unknown", eventId: event.id });
   return { ok: true, email, payment_failed: true };
 }
 
@@ -570,6 +624,12 @@ export default async function handler(req, res) {
     });
   }
 
+  // Idempotency: if we've already recorded this event id, skip re-processing.
+  const seen = await recordStripeEvent(event.id, event.type);
+  if (seen.alreadyProcessed) {
+    return res.status(200).json({ received: true, type: event.type, duplicate: true });
+  }
+
   try {
     let result = {
       ok: true,
@@ -585,16 +645,12 @@ export default async function handler(req, res) {
       result = await handlePaymentIntentSucceeded(event);
     }
 
+    else if (event.type === "payment_intent.payment_failed") {
+      result = await handlePaymentIntentFailed(event);
+    }
+
     else if (event.type === "invoice.payment_succeeded") {
       result = await handleInvoicePaymentSucceeded(event);
-    }
-
-    else if (event.type === "customer.subscription.deleted") {
-      result = await handleSubscriptionDeleted(event);
-    }
-
-    else if (event.type === "invoice.payment_failed") {
-      result = await handleInvoicePaymentFailed(event);
     }
 
     else if (
