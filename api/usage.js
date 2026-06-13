@@ -235,6 +235,54 @@ function resolveEntitlement(customer) {
 }
 
 // ───────────────────────────────────────────────
+// NEW ENTITLEMENT LAYER (12-month Founding Pass)
+// Read-only overlay: looks up an active, non-expired scanner pass in
+// user_entitlements and GRANTS it on top of the legacy entitlement.
+// It can only raise the limit / mark paid — never reduce legacy access.
+// ───────────────────────────────────────────────
+
+async function getActiveScannerPass(email) {
+  if (!email) return null;
+  try {
+    const res = await sb(
+      `user_entitlements?email=eq.${encodeURIComponent(email)}` +
+        `&entitlement_type=eq.scanner_access&status=eq.active` +
+        `&select=plan_code,ends_at,scanner_plans(included_scans_per_month)`
+    );
+    if (!res.ok) return null;
+    const rows = await res.json();
+    const now = new Date();
+    let best = null;
+    for (const e of rows) {
+      if (e.ends_at && new Date(e.ends_at) <= now) continue; // expired → does not grant
+      const lim =
+        Number((e.scanner_plans && e.scanner_plans.included_scans_per_month) || 0) ||
+        SCANNER_PAID_LIMIT;
+      if (!best || lim > best.limit) {
+        best = { plan: e.plan_code || "scanner_pass", limit: lim, endsAt: e.ends_at || null };
+      }
+    }
+    return best;
+  } catch (err) {
+    console.error("[usage] scanner pass lookup error:", err);
+    return null;
+  }
+}
+
+function mergePassEntitlement(entitlement, pass) {
+  if (!pass) return entitlement;
+  const limit = Math.max(Number(entitlement.limit || 0), Number(pass.limit || 0));
+  const keepLegacyLabel = entitlement.isPaid && Number(entitlement.limit || 0) >= Number(pass.limit || 0);
+  return {
+    ...entitlement,
+    plan: keepLegacyLabel ? entitlement.plan : pass.plan,
+    limit,
+    isPaid: true,
+    scannerEndsAt: pass.endsAt || entitlement.scannerEndsAt || null,
+  };
+}
+
+// ───────────────────────────────────────────────
 // USAGE TABLE
 // ───────────────────────────────────────────────
 
@@ -388,6 +436,7 @@ function computeState(usage, entitlement) {
     plan: entitlement.plan,
     state,
     can_scan: canScan,
+    scanner_access_ends_at: entitlement.scannerEndsAt || null,
   };
 }
 
@@ -426,14 +475,12 @@ export default async function handler(req, res) {
 
     const customer = await getCustomer(email);
 
-    if (!customer) {
-      return res.status(403).json({
-        error: "no_access",
-        message: "ไม่พบสิทธิ์ใช้งาน",
-      });
-    }
-
-    const entitlement = resolveEntitlement(customer);
+    // Free signups and pass holders have no customers row — they are NOT blocked.
+    // Legacy customers resolve exactly as before; an active 12-month pass is
+    // overlaid grant-only on top (can only raise the limit / mark paid).
+    let entitlement = resolveEntitlement(customer); // free tier when no customer
+    const scannerPass = await getActiveScannerPass(email);
+    entitlement = mergePassEntitlement(entitlement, scannerPass);
 
     let usage = await getOrCreateUsage(email, entitlement);
     usage = await resetMonthIfNeeded(usage);

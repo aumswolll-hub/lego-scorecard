@@ -435,6 +435,7 @@ body.lego-method-student .upsell-result-btn,
 body.lego-method-student .upsell-btn,
 body.lego-method-student .tracker-upsell-btn,
 body.lego-method-student #paywallMethodCard,
+body.lego-method-student #paywallProof,
 body.lego-method-student .af-upsell { display: none !important; }
 .credit-banner.expiring { box-shadow: 4px 4px 0 var(--gold); }
 .credit-banner .credit-gem {
@@ -1246,6 +1247,14 @@ tbody td.score { font-family: 'Fraunces', serif; font-weight: 700; font-size: 15
 .paywall-title { font-size: 30px; letter-spacing: -0.02em; margin-bottom: 10px; }
 .paywall-title em { font-style: italic; color: var(--red); }
 .paywall-sub { font-size: 14px; color: var(--ink-mute); }
+/* ── Proof strip inside paywall (the convert moment) ── */
+.paywall-proof { padding: 24px 36px 4px; }
+.paywall-proof .pp-label { text-align: center; font-size: 11px; letter-spacing: 0.18em; color: var(--ink-mute); margin-bottom: 14px; text-transform: uppercase; }
+.paywall-proof .pp-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.paywall-proof figure { margin: 0; border: 1.5px solid var(--ink); background: var(--cream-soft); box-shadow: 4px 4px 0 var(--ink); }
+.paywall-proof figure img { display: block; width: 100%; height: 150px; object-fit: cover; object-position: top; border-bottom: 1.5px solid var(--ink); }
+.paywall-proof figcaption { font-size: 11px; line-height: 1.45; color: var(--ink); padding: 8px 10px; }
+@media (max-width: 600px) { .paywall-proof { padding: 18px 20px 0; } .paywall-proof .pp-grid { grid-template-columns: 1fr; } .paywall-proof figure img { height: 180px; } }
 .paywall-options { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding: 32px 36px; }
 .paywall-card { border: 1.5px solid var(--grey-line); padding: 24px 22px; position: relative; display: flex; flex-direction: column; }
 .paywall-card.best { border: 2px solid var(--ink); background: var(--cream-soft); box-shadow: 5px 5px 0 var(--gold); }
@@ -1856,20 +1865,38 @@ body.result-locked .result-block::after {
       <p class="paywall-sub">ปลดล็อกเครื่องมือตรวจสินค้า หรือเข้า LEGO METHOD เพื่อเรียนทั้งระบบตั้งแต่เลือกสินค้า → คิดมุมคลิป → ทำคลิปขาย</p>
     </div>
 
+    <div class="paywall-proof" id="paywallProof">
+      <div class="pp-label">คนที่ใช้เครื่องมือ + ระบบนี้ ทำได้จริง</div>
+      <div class="pp-grid">
+        <figure>
+          <img src="/proof/tomoya-60k.jpg" alt="ผลนักเรียน" loading="lazy">
+          <figcaption>เดือนนี้ทำได้ <strong>60,000</strong> — เปลี่ยนชีวิตเพราะ LEGO</figcaption>
+        </figure>
+        <figure>
+          <img src="/proof/case-44orders.jpg" alt="ผลนักเรียน" loading="lazy">
+          <figcaption><strong>44 ออเดอร์ / 5k</strong> ลงคลิปวันเดียว</figcaption>
+        </figure>
+        <figure>
+          <img src="/proof/macca-lv4.jpg" alt="ผลนักเรียน" loading="lazy">
+          <figcaption>TikTok Shop <strong>Creator Level 4</strong> · วันปิด 10k</figcaption>
+        </figure>
+      </div>
+    </div>
+
     <div class="paywall-options" id="paywallOptions">
       <!-- Option 1: Scanner only -->
       <div class="paywall-card" id="paywallScannerCard">
-        <div class="pc-name">LEGO SCANNER</div>
-        <div class="pc-price"><span id="pwScannerPrice">1,990</span> บาท</div>
+        <div class="pc-name">LEGO SCANNER · FOUNDING PASS</div>
+        <div class="pc-price"><span id="pwScannerPrice">5,900</span> บาท<span style="font-size:14px;color:var(--ink-mute);font-weight:400"> · ใช้ได้ 12 เดือน</span></div>
         <ul class="pc-benefits">
-          <li>สแกนสินค้าได้ <strong>100 scans/เดือน</strong></li>
+          <li>สแกนสินค้าได้ <strong>300 scans/เดือน</strong></li>
           <li>เห็นคะแนนเต็มทั้ง 7 จุด</li>
           <li>บันทึกประวัติสินค้า + Tracker</li>
           <li>เรียงลำดับสินค้าที่ควรทำก่อน</li>
           <li>ลดความเสี่ยงก่อนเสียเวลาถ่ายคลิป</li>
-          <li>เหมาะกับคนที่อยากคัดสินค้าให้แม่นขึ้น</li>
+          <li><strong>จ่ายครั้งเดียว</strong> · ใช้ได้ 12 เดือน · ไม่ตัดบัตรอัตโนมัติ</li>
         </ul>
-        <a href="#" id="pwScannerBtn" class="pc-btn pc-btn-secondary" target="_blank" rel="noopener" onclick="return handlePaywallScanner(event)">ปลดล็อกเครื่องมือตรวจสินค้า</a>
+        <a href="#" id="pwScannerBtn" class="pc-btn pc-btn-secondary" onclick="return handlePaywallScanner(event)">ซื้อ Founding Pass (12 เดือน)</a>
       </div>
 
       <!-- Option 2: LEGO METHOD (best value) -->
@@ -2053,9 +2080,10 @@ const METHOD_PROMO_CODE = "method1990";
 const METHOD_BASE_URL = METHOD_CREDIT_CHECKOUT_URL;
 const METHOD_FULL_PRICE_URL = METHOD_CHECKOUT_URL;
 
-// Scanner standalone purchase (paywall option 1)
-const SCANNER_PRICE = "1,990";
-const SCANNER_CHECKOUT_URL = "https://buy.stripe.com/5kQ5kE2gM27Kbph5ac9oc0e";
+// Scanner FOUNDING PASS (paywall option 1) — one-time, 12-month access.
+// Sold via a single live Stripe Payment Link (not dynamic Checkout).
+const SCANNER_PRICE = "5,900"; // baht, one-time — matches the Stripe price behind the link
+const SCANNER_CHECKOUT_URL = "https://buy.stripe.com/6oU6oI8FafYA50T5ac9oc0k"; // ฿5,900 Founding Pass
 const METHOD_PRICE_DISPLAY = "8,990";
 const LINE_FALLBACK_URL = ""; // ใส่ LINE URL ถ้ามี (เผื่อ checkout ล่ม)
 
@@ -2269,6 +2297,34 @@ async function loadUsageState() {
   }
 }
 
+// After returning from Stripe Checkout (?pass=success). The webhook grants the
+// entitlement asynchronously, so we poll /api/usage a few times until the pass
+// shows up, then confirm. (DoD: "Payment received. We are activating...")
+async function handlePassCheckoutReturn() {
+  const params = new URLSearchParams(window.location.search);
+  const pass = params.get("pass");
+  if (!pass) return;
+  history.replaceState({}, "", window.location.pathname); // clean the URL
+
+  if (pass === "cancel") { showToast("ยกเลิกการชำระเงินแล้ว"); return; }
+  if (pass !== "success") return;
+
+  showToast("ชำระเงินสำเร็จ กำลังเปิดสิทธิ์ใช้งาน...");
+  let tries = 0;
+  const iv = setInterval(async () => {
+    tries++;
+    await loadUsageState();
+    const active = usageState && usageState.scanner_access_ends_at;
+    if (active || tries >= 6) {
+      clearInterval(iv);
+      showToast(active
+        ? "เปิดสิทธิ์ Founding Pass แล้ว ✓ ใช้ได้ 12 เดือน"
+        : "ได้รับการชำระเงินแล้ว กำลังเปิดสิทธิ์ — ลองรีเฟรชอีกครั้ง หากยังไม่ขึ้นทักทีมงานได้เลย");
+    }
+  }, 2500);
+}
+window.addEventListener("load", () => setTimeout(handlePassCheckoutReturn, 1200));
+
 // นับ scan (เรียกเมื่อ scan สำเร็จเท่านั้น)
 async function incrementScan() {
   if (!currentSession?.token) return;
@@ -2337,6 +2393,15 @@ function updateScanCounter() {
 
   if (plan === "lego_method" || state === "lego_method_student" || usageState.is_lego_method_student) {
     el.innerHTML = `<span class="sc-badge student">✦ LEGO METHOD · เหลือ ${left}/${limit} scans</span>`;
+    return;
+  }
+
+  if (usageState.scanner_access_ends_at && (plan === "lego_scanner_founding" || plan === "scanner_pass")) {
+    let dateStr = "";
+    try {
+      dateStr = new Date(usageState.scanner_access_ends_at).toLocaleDateString("th-TH", { year: "numeric", month: "short", day: "numeric" });
+    } catch (e) {}
+    el.innerHTML = `<span class="sc-badge paid">✓ Founding Pass · เหลือ ${left}/${limit}${dateStr ? ` · ถึง ${dateStr}` : ""}</span>`;
     return;
   }
 
@@ -2570,7 +2635,9 @@ function showPaywall() {
   if (mp) mp.textContent = hasCredit ? "7,000" : METHOD_PRICE_DISPLAY;
 
   if (scannerBtn) {
-    scannerBtn.setAttribute("href", SCANNER_CHECKOUT_URL || "#");
+    // Static Stripe Payment Link; handlePaywallScanner adds prefilled_email on click.
+    scannerBtn.setAttribute("href", SCANNER_CHECKOUT_URL);
+    scannerBtn.setAttribute("target", "_self");
   }
 
   if (methodBtn) {
@@ -2592,16 +2659,38 @@ function showPaywall() {
     usageState.plan === "lego_method" || usageState.plan === "legacy_method" ||
     usageState.plan === "admin"
   );
+  const proof = document.getElementById("paywallProof");
   if (isMethodUser) {
     if (tag) tag.textContent = "ใช้ครบโควต้าเดือนนี้";
     if (title) title.innerHTML = `สแกนครบโควต้ารายเดือนแล้ว`;
     if (sub) sub.textContent = "โควต้าจะรีเซ็ตเดือนหน้า — ระหว่างนี้ใช้ Tracker จัดการสินค้าที่สแกนไว้ได้";
     if (options) options.style.display = "none";
+    if (proof) proof.style.display = "none"; // students never see the upsell proof
     document.getElementById("paywallOverlay").classList.add("active");
     document.body.style.overflow = "hidden";
     return;
   }
   if (options) options.style.display = ""; // restore for non-students
+  if (proof) proof.style.display = "";
+
+  const scannerCard = document.getElementById("paywallScannerCard");
+  if (scannerCard) scannerCard.style.display = ""; // default visible
+
+  // Founding Pass holder who hit their 300/month cap: they already OWN the pass —
+  // don't re-sell it. Show a quota-reset note and keep only the METHOD upsell.
+  const isFoundingPass = usageState && (
+    usageState.plan === "lego_scanner_founding" || usageState.scanner_access_ends_at
+  );
+  if (isFoundingPass) {
+    if (tag) tag.textContent = "ใช้ครบโควต้าเดือนนี้";
+    if (title) title.innerHTML = `สแกนครบ <em>300 ครั้ง</em> เดือนนี้แล้ว`;
+    if (sub) sub.textContent = "โควต้าจะรีเซ็ตเดือนหน้า — ระหว่างนี้ใช้ Tracker จัดการสินค้าที่สแกนไว้ หรือต่อยอดด้วย LEGO METHOD";
+    if (scannerCard) scannerCard.style.display = "none"; // already owns the pass
+    document.getElementById("paywallOverlay").classList.add("active");
+    document.body.style.overflow = "hidden";
+    trackEvent("scanner_pass_quota_reached", { plan: usageState?.plan || "lego_scanner_founding" });
+    return;
+  }
 
   if (usageState?.plan === "scanner_paid" || usageState?.state === "paid_scanner") {
     if (tag) tag.textContent = "ถึงเวลาต่อยอด";
@@ -2630,10 +2719,15 @@ function closePaywall() {
 
 function handlePaywallScanner(e) {
   if (e) e.preventDefault();
-  trackEvent("scanner_upgrade_scanner_clicked");
-  const url = SCANNER_CHECKOUT_URL || LINE_FALLBACK_URL;
-  if (url) { window.open(url, "_blank", "noopener"); }
-  else { showToast("ระบบชำระเงินกำลังเชื่อมต่อ กรุณาทัก LINE เพื่อปลดล็อก"); }
+  trackEvent("scanner_pass_link_clicked");
+
+  // Single live Stripe Payment Link. Prefill the logged-in email so the payment
+  // keys to the right account automatically (Payment Links carry no user_id).
+  let url = SCANNER_CHECKOUT_URL;
+  const email = (window.currentSession && window.currentSession.email) || "";
+  if (email) url += (url.includes("?") ? "&" : "?") + "prefilled_email=" + encodeURIComponent(email);
+
+  window.location.href = url; // returns to /?pass=success after payment
   return false;
 }
 
