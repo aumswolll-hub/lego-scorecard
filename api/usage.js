@@ -282,6 +282,51 @@ function mergePassEntitlement(entitlement, pass) {
   };
 }
 
+// Phase 2: new-layer Method access overlay (entitlement_type=lego_method_access).
+// GRANT-ONLY like the scanner pass: marks the user a Method student, raises the
+// limit, and never lowers legacy access. Safe even before the catalog migration
+// is applied (a missing table just returns null).
+async function getActiveMethodAccess(email) {
+  if (!email) return null;
+  try {
+    const res = await sb(
+      `user_entitlements?email=eq.${encodeURIComponent(email)}` +
+        `&entitlement_type=eq.lego_method_access&status=eq.active` +
+        `&select=plan_code,ends_at,scanner_plans(included_scans_per_month)`
+    );
+    if (!res.ok) return null;
+    const rows = await res.json();
+    const now = new Date();
+    let best = null;
+    for (const e of rows) {
+      if (e.ends_at && new Date(e.ends_at) <= now) continue; // expired → no grant
+      const lim =
+        Number((e.scanner_plans && e.scanner_plans.included_scans_per_month) || 0) ||
+        LEGO_METHOD_LIMIT;
+      if (!best || lim > best.limit) {
+        best = { plan: e.plan_code || "lego_method", limit: lim, endsAt: e.ends_at || null };
+      }
+    }
+    return best;
+  } catch (err) {
+    console.error("[usage] method access lookup error:", err);
+    return null;
+  }
+}
+
+function mergeMethodEntitlement(entitlement, method) {
+  if (!method) return entitlement;
+  const limit = Math.max(Number(entitlement.limit || 0), Number(method.limit || 0));
+  return {
+    ...entitlement,
+    plan: entitlement.isStudent ? entitlement.plan : method.plan || "lego_method",
+    limit,
+    isPaid: true,
+    isStudent: true,
+    scannerEndsAt: entitlement.scannerEndsAt || method.endsAt || null,
+  };
+}
+
 // ───────────────────────────────────────────────
 // USAGE TABLE
 // ───────────────────────────────────────────────
@@ -481,6 +526,8 @@ export default async function handler(req, res) {
     let entitlement = resolveEntitlement(customer); // free tier when no customer
     const scannerPass = await getActiveScannerPass(email);
     entitlement = mergePassEntitlement(entitlement, scannerPass);
+    const methodAccess = await getActiveMethodAccess(email); // Phase 2 (grant-only)
+    entitlement = mergeMethodEntitlement(entitlement, methodAccess);
 
     let usage = await getOrCreateUsage(email, entitlement);
     usage = await resetMonthIfNeeded(usage);

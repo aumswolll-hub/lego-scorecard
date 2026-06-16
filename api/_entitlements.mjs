@@ -133,6 +133,37 @@ export async function resolveUserEntitlements(email, userId = null) {
     console.error("[entitlements] new read error:", err);
   }
 
+  // 3) Method access (new layer, Phase 2). Open-ended unless ends_at set.
+  //    GRANT-ONLY: raises scanner access + sets the method flag; never lowers.
+  try {
+    const res = await sbRest(
+      `user_entitlements?email=eq.${encodeURIComponent(email)}` +
+        `&entitlement_type=eq.lego_method_access&status=eq.active` +
+        `&select=plan_code,source,ends_at,scanner_plans(included_scans_per_month)`
+    );
+    if (res.ok) {
+      const rows = await res.json();
+      const now = new Date();
+      for (const e of rows) {
+        if (e.ends_at && new Date(e.ends_at) <= now) continue; // expired → no grant
+        result.has_scanner_access = true; // Method implies scanner access
+        result.is_paid_scanner = true;
+        result.has_method_access = true;
+
+        const planCfg = e.scanner_plans || {};
+        const limit = Number(planCfg.included_scans_per_month || 0) || UNLIMITED;
+        if (limit > result.monthly_scan_limit) result.monthly_scan_limit = limit;
+
+        if (result.effective_scanner_plan === "free" && e.plan_code) {
+          result.effective_scanner_plan = e.plan_code;
+        }
+        result.entitlement_sources.push({ source: e.source || "lego_method_purchase", plan: e.plan_code, method: true });
+      }
+    }
+  } catch (err) {
+    console.error("[entitlements] method read error:", err);
+  }
+
   return result;
 }
 
@@ -221,6 +252,74 @@ export async function grantScannerPass({
   return { ok: true, duplicate: false, email, endsAt: endsAt.toISOString() };
 }
 
+// ── Grant Method access (one-time, open-ended by default) ───────
+// Mirrors grantScannerPass. Idempotent via the unique index on
+// stripe_payment_intent_id (409 → safe no-op). Writes ONLY the new entitlement
+// layer (entitlement_type='lego_method_access'); never the legacy customers table.
+export async function grantMethodAccess({
+  email,
+  userId = null,
+  planCode = "lego_method",
+  accessDurationDays = null, // null = open-ended (OPEN_DECISION #10)
+  stripeCustomerId = null,
+  stripeCheckoutSessionId = null,
+  stripePaymentIntentId = null,
+  stripePriceId = null,
+  upgradedFrom = null, // 'scanner' when this is a Scanner→Method upgrade
+}) {
+  email = normalizeEmail(email);
+  if (!email) throw new Error("grantMethodAccess: missing email");
+
+  const startsAt = new Date();
+  const endsAt = accessDurationDays
+    ? new Date(startsAt.getTime() + accessDurationDays * 24 * 60 * 60 * 1000).toISOString()
+    : null;
+
+  const payload = {
+    user_id: userId,
+    email,
+    entitlement_type: "lego_method_access",
+    product_code: planCode,
+    plan_code: planCode,
+    source: "lego_method_purchase",
+    source_reference_id: stripePaymentIntentId || stripeCheckoutSessionId,
+    status: "active",
+    starts_at: startsAt.toISOString(),
+    ends_at: endsAt,
+    stripe_customer_id: stripeCustomerId,
+    stripe_checkout_session_id: stripeCheckoutSessionId,
+    stripe_payment_intent_id: stripePaymentIntentId,
+    stripe_price_id: stripePriceId,
+    metadata: upgradedFrom ? { upgraded_from: upgradedFrom } : {},
+  };
+
+  const res = await sbRest(`user_entitlements`, {
+    method: "POST",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify(payload),
+  });
+
+  if (res.status === 409) {
+    console.log("[entitlements] method already granted for payment_intent:", stripePaymentIntentId);
+    return { ok: true, duplicate: true, email, endsAt };
+  }
+  if (!res.ok) {
+    const t = await res.text();
+    throw new Error(`grantMethodAccess insert failed: ${res.status} ${t.slice(0, 300)}`);
+  }
+
+  console.log("[entitlements] granted method access:", { email, planCode, upgradedFrom });
+  return { ok: true, duplicate: false, email, endsAt };
+}
+
+// ── Upgrade eligibility (Scanner → Method) ───────────────────────
+// True when the email already holds PAID scanner access but NOT Method.
+// Server-checked so the client can never assert its own upgrade discount.
+export async function isScannerToMethodUpgradeEligible(email, userId = null) {
+  const ent = await resolveUserEntitlements(email, userId);
+  return ent.is_paid_scanner === true && ent.has_method_access !== true;
+}
+
 // ── Refund: revoke only the matching Stripe entitlement row ──────
 export async function refundScannerPassByPaymentIntent(paymentIntentId) {
   if (!paymentIntentId) return { ok: true, matched: false };
@@ -241,6 +340,33 @@ export async function refundScannerPassByPaymentIntent(paymentIntentId) {
   const matched = Array.isArray(rows) && rows.length > 0;
   if (matched) console.log("[entitlements] refunded pass for payment_intent:", paymentIntentId);
   return { ok: true, matched };
+}
+
+// List offer plans (plan_code + price_id + active) → builds the resolver index.
+export async function listOfferPlans() {
+  try {
+    const res = await sbRest(`scanner_plans?select=plan_code,stripe_price_id,is_active`);
+    if (!res.ok) return [];
+    return await res.json();
+  } catch (err) {
+    console.error("[entitlements] listOfferPlans error:", err);
+    return [];
+  }
+}
+
+// Mark an already-recorded Stripe event as needing a human look (e.g. an
+// ambiguous payment that was NOT auto-granted). Best-effort; never throws.
+export async function flagStripeEventForReview(eventId, message) {
+  if (!eventId) return;
+  try {
+    await sbRest(`stripe_events?stripe_event_id=eq.${encodeURIComponent(eventId)}`, {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ status: "needs_review", error_message: String(message || "").slice(0, 500) }),
+    });
+  } catch (err) {
+    console.error("[entitlements] flagStripeEventForReview error:", err);
+  }
 }
 
 // Look up the active plan config (used by checkout + webhook).

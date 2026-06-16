@@ -15,9 +15,21 @@ import { createClient } from "@supabase/supabase-js";
 import {
   recordStripeEvent,
   grantScannerPass,
+  grantMethodAccess,
+  isScannerToMethodUpgradeEligible,
   refundScannerPassByPaymentIntent,
   getPlan,
-} from "./_entitlements.js";
+  listOfferPlans,
+  flagStripeEventForReview,
+} from "./_entitlements.mjs";
+import { resolveOffer, buildPriceIndex } from "./_offer-resolve.mjs";
+
+// Phase 2 (PR-2.2): strict, price_id-authoritative grant resolution. OFF by
+// default — a deploy changes nothing until the founder maps real Stripe price
+// ids onto scanner_plans and flips this flag. When ON, an ambiguous payment is
+// NEVER auto-granted (it is flagged for founder review instead) and recognized
+// offers grant via the new entitlement layer (never the legacy customers table).
+const OFFER_RESOLVE_STRICT = /^(1|true|yes|on)$/i.test(String(process.env.OFFER_RESOLVE_STRICT || ""));
 
 export const config = {
   api: {
@@ -340,6 +352,11 @@ async function handleCheckoutSessionCompleted(event) {
     });
   }
 
+  // Phase 2 strict path (flag-gated): price_id-authoritative grant, no defaulting.
+  if (OFFER_RESOLVE_STRICT) {
+    return await handleStrictGrant(event, { session, email });
+  }
+
   const plan = await resolveCheckoutPlan(session);
 
   const payload = await upsertCustomerEntitlement({
@@ -394,6 +411,11 @@ async function handlePaymentIntentSucceeded(event) {
       paymentIntentId: intent.id,
       priceId: FOUNDING_PRICE_ID || null,
     });
+  }
+
+  // Phase 2 strict path (flag-gated): price_id/metadata-authoritative grant.
+  if (OFFER_RESOLVE_STRICT) {
+    return await handleStrictGrant(event, { intent, email });
   }
 
   const metadata = intent.metadata || {};
@@ -579,6 +601,71 @@ async function grantFoundingPass({ obj, email, stripeCustomerId, checkoutSession
   });
 
   return { ok: true, pass: true, email, endsAt: result.endsAt, duplicate: result.duplicate };
+}
+
+// ── STRICT grant (Phase 2, PR-2.2, flag-gated by OFFER_RESOLVE_STRICT) ──
+// Resolves the offer from price_id (authoritative) → metadata.plan_code, then
+// grants via the NEW entitlement layer only. Ambiguous / unrecognized / non-
+// granting (incl. Private Sprint) → NO grant + founder review. Never defaults
+// to scanner_paid and never reads an amount to choose a grant (R11/R12).
+async function handleStrictGrant(event, { session = null, intent = null, email }) {
+  const obj = session || intent;
+  const metadata = (obj && obj.metadata) || {};
+  const metadataPlanCode = metadata.plan_code || metadata.plan || null;
+
+  let priceId = null;
+  if (session) {
+    const items = await getCheckoutLineItems(session.id);
+    priceId = (items[0] && items[0].price && items[0].price.id) || null;
+  } else if (intent && intent.metadata) {
+    priceId = intent.metadata.price_id || null; // our checkout may stamp it
+  }
+
+  const amountRaw = Number(session ? session.amount_total : (intent && (intent.amount_received || intent.amount)) || 0);
+  // THB is zero-decimal, but some Stripe setups report x100 — normalize for the
+  // advisory mismatch check only (it never selects a grant).
+  const amountTotalThb = amountRaw > 100000 ? Math.round(amountRaw / 100) : amountRaw;
+
+  const index = buildPriceIndex(await listOfferPlans());
+  const r = resolveOffer({ priceId, metadataPlanCode, amountTotalThb }, index);
+
+  // Ambiguous / non-granting → never auto-grant; flag for the founder.
+  if (!r.plan_code || !r.grants) {
+    await flagStripeEventForReview(event.id, `strict_no_grant confidence=${r.confidence} plan=${r.plan_code || "none"}`);
+    console.warn("[stripe-webhook] STRICT no-grant → founder_intervention_required:", {
+      eventId: event.id, email, priceId, metadataPlanCode, plan_code: r.plan_code, confidence: r.confidence,
+    });
+    return { ok: true, granted: false, founder_intervention_required: true, plan_code: r.plan_code || null };
+  }
+
+  if (r.mismatch) {
+    await flagStripeEventForReview(event.id, `amount mismatch for ${r.plan_code} (granted by price_id)`);
+    console.warn("[stripe-webhook] STRICT amount mismatch (granted by price_id):", { eventId: event.id, plan_code: r.plan_code });
+  }
+
+  const common = {
+    email,
+    userId: resolveGrantIdentity(obj, email).userId,
+    planCode: r.plan_code,
+    stripeCustomerId: (obj && obj.customer) || null,
+    stripeCheckoutSessionId: session ? session.id : null,
+    stripePaymentIntentId: session ? session.payment_intent || null : intent.id,
+    stripePriceId: priceId,
+  };
+
+  if (r.entitlement_type === "scanner_access") {
+    const result = await grantScannerPass({ ...common, accessDurationDays: Number(r.access_duration_days || 365) });
+    return { ok: true, granted: true, offer: r.plan_code, scope: "scanner_access", duplicate: result.duplicate };
+  }
+
+  if (r.entitlement_type === "lego_method_access") {
+    const upgraded = (await isScannerToMethodUpgradeEligible(email, common.userId)) ? "scanner" : null;
+    const result = await grantMethodAccess({ ...common, accessDurationDays: r.access_duration_days, upgradedFrom: upgraded });
+    return { ok: true, granted: true, offer: r.plan_code, scope: "lego_method_access", upgraded_from: upgraded, duplicate: result.duplicate };
+  }
+
+  await flagStripeEventForReview(event.id, `unknown entitlement_type for ${r.plan_code}`);
+  return { ok: true, granted: false, founder_intervention_required: true };
 }
 
 // One-time payment failed — log a recoverable state, never grant.

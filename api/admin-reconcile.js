@@ -13,7 +13,7 @@
 
 import Stripe from "stripe";
 import { resolveSessionIdentity, getSessionToken, isAdmin } from "./_auth-helpers.js";
-import { grantScannerPass } from "./_entitlements.js";
+import { grantScannerPass } from "./_entitlements.mjs";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const SUPABASE_URL = process.env.SUPABASE_URL;
