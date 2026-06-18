@@ -5018,7 +5018,12 @@ updateAll();
     const raw = textVal(id);
     if (raw === "") return null;
 
-    const n = Number(raw);
+    // Strip commas, %, currency, units, and any trailing non-numeric chars
+    // so common Thai inputs like "1,000", "5%", "100 ชิ้น" still parse.
+    const cleaned = raw.replace(/,/g, "").replace(/[^\d.\-]/g, "").trim();
+    if (cleaned === "" || cleaned === "-" || cleaned === ".") return null;
+
+    const n = Number(cleaned);
     return Number.isFinite(n) ? n : null;
   }
 
@@ -5107,15 +5112,22 @@ updateAll();
 
     btn.textContent = "ดูผลและบันทึก";
 
+    // Always keep the button clickable. saveProduct() runs
+    // getMissingScannerFields() and shows a detailed toast listing
+    // which fields are still empty — disabling the button hides that
+    // feedback entirely and looks like a dead button to the user.
+    btn.disabled = false;
+    btn.removeAttribute("disabled");
+
     const ready = formComplete();
 
     if (!ready) {
-      btn.disabled = true;
-      btn.title = "กรอกข้อมูลให้ครบก่อนดูผลและบันทึก";
+      btn.title = "กดเพื่อตรวจว่าช่องไหนยังว่าง — ระบบจะบอกให้ครบทุกช่อง";
+      btn.classList.add("btn-incomplete");
       return;
     }
 
-    btn.disabled = false;
+    btn.classList.remove("btn-incomplete");
 
     if (!canUserScan()) {
       btn.title = "ใช้ครบแล้ว กดเพื่อดูแพ็กเกจ";
@@ -5230,7 +5242,15 @@ updateAll();
       if (!formComplete()) {
         e.preventDefault();
         e.stopImmediatePropagation();
-        showMsg("กรอกข้อมูลให้ครบก่อนดูผลและบันทึก");
+        // Prefer the detailed missing-field feedback (highlights each
+        // empty input and scrolls to the first one). Fall back to the
+        // generic toast if the helper isn't available.
+        if (typeof getMissingScannerFields === "function" &&
+            typeof flagMissingFields === "function") {
+          flagMissingFields(getMissingScannerFields());
+        } else {
+          showMsg("กรอกข้อมูลให้ครบก่อนดูผลและบันทึก");
+        }
         forceButtonState();
         return false;
       }
