@@ -326,6 +326,21 @@ async function getEmailFromStripeCustomer(customerId) {
 async function handleCheckoutSessionCompleted(event) {
   const session = event.data.object;
 
+  // PromptPay / delayed payment methods: checkout.session.completed fires with
+  // payment_status='unpaid' BEFORE the money moves. Never grant here — the
+  // grant happens on checkout.session.async_payment_succeeded (same handler,
+  // payment_status will be 'paid'). 'no_payment_required' (free/trial) passes.
+  if (session.payment_status && session.payment_status === "unpaid") {
+    console.log("Checkout completed but unpaid (async payment pending):", {
+      eventId: event.id,
+      sessionId: session.id,
+    });
+    return {
+      ok: true,
+      deferred: "awaiting_async_payment",
+    };
+  }
+
   const email = normalizeEmail(
     session.customer_email ||
       session.customer_details?.email ||
@@ -724,8 +739,21 @@ export default async function handler(req, res) {
       type: event.type,
     };
 
-    if (event.type === "checkout.session.completed") {
+    if (
+      event.type === "checkout.session.completed" ||
+      event.type === "checkout.session.async_payment_succeeded"
+    ) {
       result = await handleCheckoutSessionCompleted(event);
+    }
+
+    else if (event.type === "checkout.session.async_payment_failed") {
+      const s = event.data.object;
+      console.warn("Async payment failed (no grant):", {
+        eventId: event.id,
+        sessionId: s.id,
+        email: normalizeEmail(s.customer_email || s.customer_details?.email) || "unknown",
+      });
+      result = { ok: true, payment_failed: true };
     }
 
     else if (event.type === "payment_intent.succeeded") {

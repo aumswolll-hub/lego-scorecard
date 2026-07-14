@@ -11,6 +11,7 @@
 // This avoids email reset rate limit for legacy Magic Link customers.
 
 import { createClient } from "@supabase/supabase-js";
+import { resolveUserEntitlements } from "./_entitlements.mjs";
 
 function normalizeEmail(email) {
   return String(email || "").trim().toLowerCase();
@@ -123,34 +124,32 @@ export default async function handler(req, res) {
       });
     }
 
-    // 1) Check entitlement first
-    const { data: customer, error: customerError } = await supabase
-      .from("customers")
-      .select(
-        "email, active, deactivated_at, plan, is_paid, has_method, monthly_scan_limit, legacy_unlimited"
-      )
-      .eq("email", email)
-      .eq("active", true)
-      .is("deactivated_at", null)
-      .maybeSingle();
+    // 1) Check entitlement first — UNION of legacy customers + user_entitlements.
+    //    Buyers granted via the new Stripe entitlement layer have NO customers
+    //    row; checking only customers locked them out of setting a password.
+    let entitlement;
 
-    if (customerError) {
-      console.error("[register] customer query error:", customerError);
+    try {
+      entitlement = await resolveUserEntitlements(email);
+    } catch (err) {
+      console.error("[register] entitlement resolve error:", err);
 
       return res.status(500).json({
         error: "db_error",
         message: "ตรวจสอบสิทธิ์ไม่สำเร็จ",
-        detail: customerError.message || customerError,
+        detail: String(err?.message || err),
       });
     }
 
-    if (!customer) {
+    if (!entitlement.has_scanner_access) {
       return res.status(403).json({
         error: "no_access",
         message:
           "ยังไม่พบสิทธิ์ของอีเมลนี้ กรุณาใช้อีเมลเดียวกับที่ใช้ชำระเงิน หรือแจ้งทีมงานตรวจสอบ",
       });
     }
+
+    const customer = { plan: entitlement.effective_scanner_plan };
 
     // 2) Find auth user
     let existingUser = null;

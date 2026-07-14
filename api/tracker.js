@@ -9,6 +9,8 @@
 // - SUPABASE_SERVICE_ROLE_KEY
 // ════════════════════════════════════════════════
 
+import { hasActiveAccess } from "./_entitlements.mjs";
+
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -85,24 +87,12 @@ async function getEmailFromMagicSession(sessionToken) {
   }
 }
 
-// เช็กว่า email นี้อยู่ใน customers และ active จริง
+// เช็กสิทธิ์: customers เดิม หรือ user_entitlements ใหม่ (สอง layer เสมอ)
 async function customerHasAccess(email) {
   if (!email) return false;
 
   try {
-    const res = await sb(
-      `customers?email=eq.${encodeURIComponent(email)}&active=eq.true&deactivated_at=is.null&select=email,active,deactivated_at`
-    );
-
-    if (!res.ok) {
-      const detail = await res.text().catch(() => "");
-      console.error("[tracker auth] customer access query failed:", detail);
-      return false;
-    }
-
-    const rows = await res.json();
-
-    return rows.length > 0;
+    return await hasActiveAccess(email);
   } catch (err) {
     console.error("[tracker auth] customer access error:", err);
     return false;

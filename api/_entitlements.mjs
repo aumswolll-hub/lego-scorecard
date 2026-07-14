@@ -167,6 +167,16 @@ export async function resolveUserEntitlements(email, userId = null) {
   return result;
 }
 
+// ── Access gate (UNION of legacy customers + user_entitlements) ──
+// The one boolean every protected endpoint should call. True when the email
+// has ANY active source: legacy customers row OR an active (non-expired)
+// scanner/method entitlement. Replaces the old customers-only checks that
+// locked out buyers granted via the new entitlement layer.
+export async function hasActiveAccess(email, userId = null) {
+  const ent = await resolveUserEntitlements(email, userId);
+  return ent.has_scanner_access === true;
+}
+
 // ── Idempotency ──────────────────────────────────────────────────
 // Insert the event id; PK conflict means we've already processed it.
 // Returns { alreadyProcessed: boolean }.

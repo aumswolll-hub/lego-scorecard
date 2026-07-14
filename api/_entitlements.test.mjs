@@ -104,3 +104,57 @@ test("buildPriceIndex (via resolver) + grant routing stay decoupled", async () =
   const plans = await ent.listOfferPlans();
   assert.deepEqual(plans, []);
 });
+
+// ── hasActiveAccess: the unified gate (regression for the lockout bug) ──
+// Buyers granted ONLY via user_entitlements (no customers row) must pass.
+
+test("hasActiveAccess: entitlement-only buyer (no customers row) → true", async () => {
+  installFetch([
+    ["customers", () => res([])], // paid via new layer → NO legacy row
+    ["entitlement_type=eq.scanner_access", () => res([
+      { plan_code: "lego_scanner_founding", source: "stripe_one_time", ends_at: new Date(Date.now() + 86400000).toISOString(), scanner_plans: { included_scans_per_month: 100 } },
+    ])],
+    ["entitlement_type=eq.lego_method_access", () => res([])],
+  ]);
+  assert.equal(await ent.hasActiveAccess("paid-but-locked-out@x.com"), true);
+});
+
+test("hasActiveAccess: legacy customers row only → true (unchanged behavior)", async () => {
+  installFetch([
+    ["customers", () => res([{ plan: "legacy_scanner", has_method: false, legacy_unlimited: true, monthly_scan_limit: null }])],
+    ["entitlement_type=eq.scanner_access", () => res([])],
+    ["entitlement_type=eq.lego_method_access", () => res([])],
+  ]);
+  assert.equal(await ent.hasActiveAccess("legacy@x.com"), true);
+});
+
+test("hasActiveAccess: method-entitlement-only buyer → true", async () => {
+  installFetch([
+    ["customers", () => res([])],
+    ["entitlement_type=eq.scanner_access", () => res([])],
+    ["entitlement_type=eq.lego_method_access", () => res([
+      { plan_code: "lego_method", source: "lego_method_purchase", ends_at: null, scanner_plans: { included_scans_per_month: 300 } },
+    ])],
+  ]);
+  assert.equal(await ent.hasActiveAccess("method@x.com"), true);
+});
+
+test("hasActiveAccess: expired pass only → false", async () => {
+  installFetch([
+    ["customers", () => res([])],
+    ["entitlement_type=eq.scanner_access", () => res([
+      { plan_code: "lego_scanner_founding", source: "stripe_one_time", ends_at: new Date(Date.now() - 86400000).toISOString(), scanner_plans: { included_scans_per_month: 100 } },
+    ])],
+    ["entitlement_type=eq.lego_method_access", () => res([])],
+  ]);
+  assert.equal(await ent.hasActiveAccess("expired@x.com"), false);
+});
+
+test("hasActiveAccess: nothing anywhere → false", async () => {
+  installFetch([
+    ["customers", () => res([])],
+    ["entitlement_type=eq.scanner_access", () => res([])],
+    ["entitlement_type=eq.lego_method_access", () => res([])],
+  ]);
+  assert.equal(await ent.hasActiveAccess("stranger@x.com"), false);
+});

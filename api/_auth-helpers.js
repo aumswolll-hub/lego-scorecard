@@ -6,6 +6,8 @@
 // a lowercased email, then verify the email has customer access.
 // ════════════════════════════════════════════════
 
+import { hasActiveAccess } from "./_entitlements.mjs";
+
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -59,15 +61,12 @@ async function getEmailFromMagicSession(token) {
   }
 }
 
+// Access = legacy customers row OR active user_entitlements row.
+// (Buyers granted via the new entitlement layer have NO customers row.)
 async function customerHasAccess(email) {
   if (!email) return false;
   try {
-    const res = await sbRest(
-      `customers?email=eq.${encodeURIComponent(email)}&active=eq.true&deactivated_at=is.null&select=email`
-    );
-    if (!res.ok) return false;
-    const rows = await res.json();
-    return rows.length > 0;
+    return await hasActiveAccess(email);
   } catch (err) {
     console.error("[scans auth] customer access error:", err);
     return false;

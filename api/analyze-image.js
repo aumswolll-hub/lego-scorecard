@@ -4,6 +4,8 @@
 // Conservative mode: ไม่มั่นใจ = null ไม่เดา
 // ════════════════════════════════════════════════
 
+import { hasActiveAccess, resolveUserEntitlements } from "./_entitlements.mjs";
+
 export const config = {
   api: {
     bodyParser: { sizeLimit: "10mb" },
@@ -86,25 +88,14 @@ async function getEmailFromMagicSession(token) {
 }
 
 /*
-  เช็กว่า email นี้อยู่ใน customers และ active จริงไหม
+  เช็กสิทธิ์: customers เดิม หรือ user_entitlements ใหม่ (คนซื้อผ่าน Stripe
+  เส้นทางใหม่ไม่มีแถวใน customers — ต้องอ่านสอง layer เสมอ)
 */
 async function customerHasAccess(email) {
   if (!email) return false;
 
   try {
-    const res = await sb(
-      `customers?email=eq.${encodeURIComponent(email)}&active=eq.true&deactivated_at=is.null&select=email,active,deactivated_at`
-    );
-
-    if (!res.ok) {
-      const detail = await res.text().catch(() => "");
-      console.error("[auth] customer access query failed:", detail);
-      return false;
-    }
-
-    const rows = await res.json();
-
-    return rows.length > 0;
+    return await hasActiveAccess(email);
   } catch (err) {
     console.error("[auth] customer access error:", err);
     return false;
@@ -140,15 +131,8 @@ async function getEmailFromSession(token) {
 
 async function hasMethodAccess(email) {
   try {
-    const res = await sb(
-      `customers?email=eq.${encodeURIComponent(email)}&select=has_method`
-    );
-
-    if (!res.ok) return false;
-
-    const rows = await res.json();
-
-    return rows.length > 0 && rows[0].has_method === true;
+    const ent = await resolveUserEntitlements(email);
+    return ent.has_method_access === true;
   } catch {
     return false;
   }

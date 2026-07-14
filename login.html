@@ -450,24 +450,19 @@
       showMessage('กำลังส่งลิงก์ตั้งรหัสผ่าน...');
 
       try {
-        const { error } = await sb.auth.resetPasswordForEmail(email, {
-          redirectTo: 'https://legoscanner.app/reset-password.html'
+        // ส่งผ่าน /api/forgot-password (Resend) — ไม่ใช้ Supabase SMTP ที่ติด
+        // rate limit ต่ำมากจน email ไม่ถึงลูกค้าจริง
+        const res = await fetch('/api/forgot-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email.trim().toLowerCase() })
         });
 
-        if (error) {
-          console.error('Reset password error:', error);
+        const data = await res.json().catch(function () { return {}; });
 
-          const msg = String(error.message || '').toLowerCase();
-
-          if (msg.includes('rate limit')) {
-            showMessage(
-              'ระบบส่งอีเมลบ่อยเกินไป กรุณารอประมาณ 30-60 นาที แล้วลองใหม่อีกครั้ง หรือใช้ปุ่ม “สร้างบัญชี / ตั้งรหัสผ่านครั้งแรก” แทน',
-              'error'
-            );
-            return;
-          }
-
-          showMessage('ส่งลิงก์ตั้งรหัสผ่านไม่สำเร็จ กรุณาลองใหม่อีกครั้ง', 'error');
+        if (!res.ok) {
+          console.error('Reset password error:', data);
+          showMessage(data.message || 'ส่งลิงก์ตั้งรหัสผ่านไม่สำเร็จ กรุณาลองใหม่อีกครั้ง', 'error');
           return;
         }
 
