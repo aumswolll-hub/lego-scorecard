@@ -15,7 +15,8 @@ export const config = {
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-const MONTHLY_LIMIT = parseInt(process.env.AUTOFILL_MONTHLY_LIMIT || "100", 10);
+// (2026-07) โควตารวมเป็นสกุลเดียว: autofill ตัดจากโควตาสแกนรายเดือนผ่าน
+// /api/usage — ไม่มี autofill limit แยกอีกต่อไป (AUTOFILL_MONTHLY_LIMIT เลิกใช้)
 const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
 const DEBUG_SCANNER = process.env.DEBUG_SCANNER === "true";
 
@@ -138,66 +139,35 @@ async function hasMethodAccess(email) {
   }
 }
 
-async function getUsage(email) {
-  const month = new Date().toISOString().slice(0, 7);
-
-  const res = await sb(
-    `autofill_usage?email=eq.${encodeURIComponent(email)}&month=eq.${month}&select=count`
-  );
-
-  let used = 0;
-
-  if (res.ok) {
-    const rows = await res.json();
-    if (rows.length) used = Number(rows[0].count || 0);
-  }
-
-  return {
-    email,
-    month,
-    used,
-    limit: MONTHLY_LIMIT,
-    allowed: used < MONTHLY_LIMIT,
-  };
+// ── โควตารวม: อ่าน/ตัดจาก /api/usage (แหล่งความจริงเดียวของโควตาสแกน) ──
+// เรียก endpoint ตัวเองภายใน deployment เดียวกัน — ไม่ refactor usage.js 598
+// บรรทัดให้เสี่ยง และ logic เดือน/entitlement/reset อยู่ที่เดียวเหมือนเดิม
+function usageApiBase(req) {
+  const proto = req.headers["x-forwarded-proto"] || "https";
+  const host = req.headers.host;
+  return `${proto}://${host}/api/usage`;
 }
 
-async function incrementUsage(email) {
-  const month = new Date().toISOString().slice(0, 7);
-  const current = await getUsage(email);
+async function getScanQuota(req, sessionToken) {
+  const res = await fetch(usageApiBase(req), {
+    method: "GET",
+    headers: { "x-session-token": sessionToken },
+  });
+  if (!res.ok) return null;
+  return res.json();
+}
 
-  if (!current.allowed) {
-    return {
-      allowed: false,
-      used: current.used,
-      limit: current.limit,
-    };
-  }
-
-  const newCount = current.used + 1;
-
-  const res = await sb(`autofill_usage?on_conflict=email,month`, {
+async function consumeScanQuota(req, sessionToken) {
+  const res = await fetch(usageApiBase(req), {
     method: "POST",
     headers: {
-      Prefer: "resolution=merge-duplicates,return=minimal",
+      "x-session-token": sessionToken,
+      "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      email,
-      month,
-      count: newCount,
-      updated_at: new Date().toISOString(),
-    }),
+    body: "{}",
   });
-
-  if (!res.ok) {
-    const detail = await res.text().catch(() => "");
-    throw new Error(`usage_increment_failed: ${detail}`);
-  }
-
-  return {
-    allowed: true,
-    used: newCount,
-    limit: MONTHLY_LIMIT,
-  };
+  if (!res.ok) return null;
+  return res.json();
 }
 
 function cleanJsonText(text) {
@@ -471,33 +441,25 @@ export default async function handler(req, res) {
       });
     }
 
-    const unlimited = await hasMethodAccess(email);
+    // ── โควตารวม: เช็คโควตาสแกนก่อนเผา AI tokens ──
+    // (admin/legacy = can_scan true เสมอจาก usage.js — ไม่ต้อง special-case)
+    const quota = await getScanQuota(req, sessionToken);
+
+    if (quota && quota.can_scan === false) {
+      return res.status(429).json({
+        error: "rate_limit",
+        message: `โควตาสแกนเดือนนี้หมดแล้ว (${quota.scans_used}/${quota.monthly_scan_limit})`,
+        used: quota.scans_used,
+        limit: quota.monthly_scan_limit,
+        upsell: true,
+      });
+    }
 
     let usageInfo = {
-      used: 0,
-      limit: MONTHLY_LIMIT,
-      unlimited,
+      used: quota ? quota.scans_used : 0,
+      limit: quota ? quota.monthly_scan_limit : 0,
+      unlimited: !!(quota && (quota.is_admin || quota.legacy_unlimited)),
     };
-
-    if (!unlimited) {
-      const usage = await getUsage(email);
-
-      if (!usage.allowed) {
-        return res.status(429).json({
-          error: "rate_limit",
-          message: `ใช้ auto-fill ครบ ${usage.limit} ครั้งในเดือนนี้แล้ว`,
-          used: usage.used,
-          limit: usage.limit,
-          upsell: true,
-        });
-      }
-
-      usageInfo = {
-        used: usage.used,
-        limit: usage.limit,
-        unlimited: false,
-      };
-    }
 
     const content = [];
 
@@ -580,13 +542,18 @@ export default async function handler(req, res) {
       });
     }
 
-    if (!unlimited) {
-      const inc = await incrementUsage(email);
+    // ตัดโควตา 1 หน่วยหลังวิเคราะห์สำเร็จ (best-effort — pre-check กันไว้แล้ว
+    // ถ้าตัดพลาดเพราะ race ไม่ทำให้ผู้ใช้เสียของที่ AI อ่านเสร็จแล้ว)
+    const consumed = await consumeScanQuota(req, sessionToken);
 
+    if (consumed) {
       usageInfo = {
-        ...inc,
-        unlimited: false,
+        used: consumed.scans_used,
+        limit: consumed.monthly_scan_limit,
+        unlimited: !!(consumed.is_admin || consumed.legacy_unlimited),
       };
+    } else {
+      console.warn("[analyze-image] quota consume failed (soft):", { email });
     }
 
     const response = {

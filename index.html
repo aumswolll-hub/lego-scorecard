@@ -6148,6 +6148,32 @@ updateAll();
     };
   }
 
+  /* ── โควตาสกุลเดียว ───────────────────────────
+     autofill ตัดโควตาสแกนที่ server (/api/analyze-image → /api/usage) แล้ว
+     → ตอนกดบันทึกฟอร์มที่มาจาก autofill ห้ามตัดซ้ำ (1 การตรวจ = 1 หน่วย) */
+  var __origApplyAutofill = window.applyAutofillData;
+  if (typeof __origApplyAutofill === "function") {
+    window.applyAutofillData = function patchedApplyAutofill() {
+      var out = __origApplyAutofill.apply(this, arguments);
+      window.__autofillCredited = true;
+      // server ตัดโควตาไปแล้ว — ดึงตัวเลขล่าสุดมาอัปเดต badge
+      try { if (typeof loadUsageState === "function") loadUsageState(); } catch (e) {}
+      return out;
+    };
+  }
+
+  var __origIncrementScan = window.incrementScan;
+  if (typeof __origIncrementScan === "function") {
+    window.incrementScan = function patchedIncrementScan() {
+      if (window.__autofillCredited) {
+        window.__autofillCredited = false; // ใช้สิทธิ์ที่จ่ายไปแล้วตอน autofill
+        try { if (typeof loadUsageState === "function") loadUsageState(); } catch (e) {}
+        return;
+      }
+      return __origIncrementScan.apply(this, arguments);
+    };
+  }
+
   // เผื่อ tracker ถูก render ไปแล้วก่อน patch นี้โหลด
   setTimeout(function() {
     try { enhanceTrackerDOM(); } catch (e) {}
