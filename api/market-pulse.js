@@ -9,8 +9,12 @@
 
 import { resolveSessionIdentity, getSessionToken, sbRest, configMissing } from "./_auth-helpers.js";
 
+// การจัดหมวดกิน AI เวลานาน — เผื่อเวลา function ให้พอ (default 10s ไม่พอ)
+export const config = { maxDuration: 60 };
+
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
+// จัดหมวด = งานง่าย ใช้ Haiku เร็ว/ถูก ไม่ต้องใช้โมเดลใหญ่
+const CLASSIFY_MODEL = process.env.PULSE_CLASSIFY_MODEL || "claude-haiku-4-5-20251001";
 const WINDOW_DAYS = 14;
 const CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000; // recompute อย่างมากวันละครั้ง
 const MIN_CATEGORY_SCANS = 8; // หมวดต้องมีสแกนพอ ก่อนประกาศร้อน/เย็น
@@ -41,7 +45,7 @@ ${JSON.stringify(names)}`;
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: ANTHROPIC_MODEL,
+      model: CLASSIFY_MODEL,
       max_tokens: 4000,
       temperature: 0,
       messages: [{ role: "user", content: prompt }],
@@ -76,7 +80,7 @@ async function computePulse() {
     if (!n) continue;
     nameCount.set(n, (nameCount.get(n) || 0) + 1);
   }
-  const topNames = [...nameCount.entries()].sort((a, b) => b[1] - a[1]).slice(0, 150).map(([n]) => n);
+  const topNames = [...nameCount.entries()].sort((a, b) => b[1] - a[1]).slice(0, 80).map(([n]) => n);
 
   let nameToCat = {};
   if (topNames.length >= 10) {
