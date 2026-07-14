@@ -5881,5 +5881,278 @@ updateAll();
   setTimeout(bootFinalAuth, 300);
 })();
 </script>
+
+<script>
+/* ════════════════════════════════════════════════
+   RETENTION ENGINE — PHASE 1
+   1) Live verdict: เห็นคะแนนทันทีเมื่อกรอกครบ (ไม่ต้องเสียโควตาเพื่อ "ดู")
+      — โควตายังนับตอน "บันทึกไป Tracker" เท่าเดิม
+   2) Staleness: ตัวเลข TikTok เป็น window 7/30 วัน — ของเก่าเกิน 14 วัน
+      ขึ้น badge + banner เตือนให้เช็คใหม่
+   3) Re-scan 1 คลิก: โหลดค่าเดิมกลับเข้าฟอร์ม อัปเดตแล้วบันทึกเป็นรอบใหม่
+      (เก็บเป็น time-series ใน product_scans อยู่แล้ว)
+   4) Outcome loop: บันทึก "โพสต์แล้ว/ขายได้/ไม่ขาย" ต่อสินค้า → คำนวณ
+      ความแม่นจริงของระบบต่อผู้ใช้ + sync ขึ้น user_product_tracker
+   ════════════════════════════════════════════════ */
+(function retentionEnginePhase1() {
+  var STALE_DAYS = 14;
+
+  /* ── CSS ── */
+  var css = document.createElement("style");
+  css.textContent = [
+    "#staleBanner { border:1.5px solid var(--gold); background:rgba(196,154,74,.12); padding:10px 14px; font-size:12.5px; line-height:1.5; margin-bottom:14px; color:var(--ink); }",
+    ".stale-badge { display:inline-block; margin-left:8px; font-size:10.5px; color:#9a7320; border:1px solid var(--gold); padding:1px 6px; white-space:nowrap; vertical-align:middle; }",
+    ".outcome-mark { margin-left:6px; font-size:12px; vertical-align:middle; }",
+    ".row-rescan { background:transparent; border:1px solid var(--grey-line); cursor:pointer; font-size:13px; padding:2px 8px; margin-right:6px; color:var(--ink); line-height:1.4; }",
+    ".row-rescan:hover { border-color:var(--ink); }",
+    "#outcomeSection { margin-top:18px; padding-top:14px; border-top:1px solid var(--grey-line); }",
+    "#outcomeSection .oc-title { font-size:11px; letter-spacing:.12em; font-weight:700; color:var(--ink-mute); margin-bottom:10px; text-transform:uppercase; }",
+    ".oc-btn { border:1.5px solid var(--ink); background:transparent; color:var(--ink); padding:8px 14px; margin:0 8px 8px 0; cursor:pointer; font-size:12.5px; font-family:'Noto Sans Thai',sans-serif; }",
+    ".oc-btn.active { background:var(--ink); color:var(--cream); }",
+    ".oc-btn.rescan { border-color:var(--gold); color:#9a7320; }",
+  ].join("\n");
+  document.head.appendChild(css);
+
+  /* ── 1) LIVE VERDICT ─────────────────────────── */
+  // ปลดล็อกผลถาวร: flag เป็น getter ที่ตอบ true เสมอ (patch เก่าทุกตัวเช็ค
+  // window.resultUnlocked ก่อน lock) + interval เก็บกวาด class ที่หลงมา
+  try {
+    Object.defineProperty(window, "resultUnlocked", {
+      get: function() { return true; },
+      set: function() {},
+      configurable: true
+    });
+  } catch (e) {}
+
+  function unlockResult() {
+    if (document.body.classList.contains("result-locked")) {
+      document.body.classList.remove("result-locked");
+    }
+  }
+  unlockResult();
+  document.addEventListener("input", function() { setTimeout(unlockResult, 0); }, true);
+  document.addEventListener("change", function() { setTimeout(unlockResult, 0); }, true);
+  setInterval(unlockResult, 400);
+
+  // ปรับ copy กล่องช่วยเหลือใต้ปุ่มให้ตรงพฤติกรรมใหม่
+  document.querySelectorAll(".save-hint").forEach(function(el) {
+    el.innerHTML = "ผลตรวจแสดง<strong>ทันที</strong>เมื่อกรอกครบ — กด “บันทึกไป Tracker” เพื่อเก็บเข้าพอร์ตและนับโควตา";
+  });
+
+  /* ── helpers ── */
+  function productKeyOf(r) { return String(r.product || "").trim().toLowerCase(); }
+
+  function staleInfo(data) {
+    var newest = {};
+    data.forEach(function(r) {
+      var k = productKeyOf(r);
+      if (!k) return;
+      var t = new Date(r.timestamp || 0).getTime();
+      if (!newest[k] || t > newest[k].t) newest[k] = { t: t, id: r.id };
+    });
+    var now = Date.now(), stale = {};
+    var count = 0;
+    Object.keys(newest).forEach(function(k) {
+      var days = Math.floor((now - newest[k].t) / 86400000);
+      if (days >= STALE_DAYS) { stale[newest[k].id] = days; count++; }
+    });
+    return { staleByRowId: stale, count: count };
+  }
+
+  /* ── 3) RE-SCAN 1 คลิก ───────────────────────── */
+  window.rescanProduct = function rescanProduct(id) {
+    var r = getTracker().find(function(x) { return x.id === id; });
+    if (!r) return;
+    try { closeDetail(); } catch (e) {}
+
+    setMode(r.mode === "discovery" ? "discovery" : "validation");
+
+    function set(fid, v) {
+      var el = document.getElementById(fid);
+      if (el) el.value = (v === null || v === undefined) ? "" : v;
+    }
+
+    set("productName", r.product);
+    if (r.mode === "validation") {
+      set("v_commission", r.v_commission);
+      set("v_orders7", r.v_orders7); set("v_orders30", r.v_orders30);
+      set("v_ctr", r.v_ctr);
+      set("v_atc7", r.v_atc7); set("v_atc30", r.v_atc30);
+      set("v_creators7", r.v_creators7); set("v_creators30", r.v_creators30);
+      set("v_stock", r.v_stock);
+    } else {
+      set("commission", r.commission);
+      set("gmv7", r.gmv7); set("gmv30", r.gmv30);
+      set("creators", r.creators); set("cr", r.cr); set("conc", r.conc);
+      for (var i = 1; i <= 5; i++) set("angle" + i, (r.angles || [])[i - 1] || "");
+    }
+
+    switchView("scorecard");
+    if (typeof updateAll === "function") updateAll();
+    unlockResult();
+    if (typeof showToast === "function") {
+      showToast("โหลด “" + r.product + "” แล้ว — อัปเดตตัวเลขล่าสุด (หรืออัปโหลดรูปใหม่) แล้วกดบันทึก");
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  /* ── 4) OUTCOME LOOP ─────────────────────────── */
+  window.markOutcome = function markOutcome(id, kind) {
+    var t = getTracker();
+    var r = t.find(function(x) { return x.id === id; });
+    if (!r) return;
+
+    r.outcome = r.outcome || {};
+    if (kind === "posted") { r.outcome.posted = true; }
+    if (kind === "order") { r.outcome.posted = true; r.outcome.gotOrder = true; }
+    if (kind === "noorder") { r.outcome.posted = true; r.outcome.gotOrder = false; }
+    r.outcome.ts = new Date().toISOString();
+    setTracker(t);
+
+    // sync ขึ้น user_product_tracker (best-effort — ห้าม block UI)
+    try {
+      var status = kind === "order" ? "Got Order" : kind === "noorder" ? "No Order" : "Posted";
+      var token = (window.currentSession && window.currentSession.token) || "";
+      fetch("/api/tracker-update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-session-token": token },
+        body: JSON.stringify({
+          product_key: productKeyOf(r),
+          user_status: status,
+          posted_count: 1,
+          got_order: kind === "order"
+        })
+      }).catch(function() {});
+    } catch (e) {}
+
+    injectOutcomeUI(id);
+    if (typeof renderTracker === "function") renderTracker();
+    if (typeof showToast === "function") {
+      showToast(kind === "order"
+        ? "บันทึกแล้ว 💰 — ทุกผลจริงทำให้ระบบทายแม่นขึ้น"
+        : "บันทึกผลแล้ว — ขอบคุณที่ช่วยให้ระบบแม่นขึ้น");
+    }
+  };
+
+  function injectOutcomeUI(id) {
+    var r = getTracker().find(function(x) { return x.id === id; });
+    if (!r) return;
+    var host = document.querySelector("#detailOverlay .detail-card") ||
+               document.querySelector("#detailOverlay > div");
+    if (!host) return;
+
+    var old = document.getElementById("outcomeSection");
+    if (old) old.remove();
+
+    var o = r.outcome || {};
+    var ageDays = Math.floor((Date.now() - new Date(r.timestamp || 0).getTime()) / 86400000);
+
+    var div = document.createElement("div");
+    div.id = "outcomeSection";
+    div.innerHTML =
+      '<div class="oc-title">ผลจริงหลังโพสต์ — ช่วยให้ระบบทายแม่นขึ้น</div>' +
+      '<button class="oc-btn' + (o.posted && o.gotOrder === undefined ? " active" : "") + '" onclick="markOutcome(' + r.id + ', \'posted\')">📤 โพสต์แล้ว</button>' +
+      '<button class="oc-btn' + (o.gotOrder === true ? " active" : "") + '" onclick="markOutcome(' + r.id + ', \'order\')">💰 ขายได้</button>' +
+      '<button class="oc-btn' + (o.gotOrder === false ? " active" : "") + '" onclick="markOutcome(' + r.id + ', \'noorder\')">ยังไม่ขาย</button>' +
+      '<button class="oc-btn rescan" onclick="rescanProduct(' + r.id + ')">↻ เช็คตัวเลขใหม่' + (ageDays >= 1 ? " (ข้อมูลอายุ " + ageDays + " วัน)" : "") + '</button>';
+    host.appendChild(div);
+  }
+
+  var __origShowDetail = window.showDetail;
+  if (typeof __origShowDetail === "function") {
+    window.showDetail = function patchedShowDetail(id) {
+      var out = __origShowDetail.apply(this, arguments);
+      try { injectOutcomeUI(id); } catch (e) {}
+      return out;
+    };
+  }
+
+  /* ── 2) STALENESS + ปุ่ม re-scan + hit-rate จริง ใน Tracker ── */
+  function enhanceTrackerDOM() {
+    var data = getTracker();
+    if (!data.length) return;
+
+    var info = staleInfo(data);
+    var container = document.getElementById("trackerContent");
+    if (!container) return;
+
+    // banner รวมยอดของที่ต้องเช็คใหม่
+    if (info.count > 0 && !document.getElementById("staleBanner")) {
+      var b = document.createElement("div");
+      b.id = "staleBanner";
+      b.innerHTML = "🕐 <strong>" + info.count + " สินค้า</strong>ข้อมูลเก่าเกิน " + STALE_DAYS +
+        " วัน — ตัวเลข TikTok เป็นรอบ 7/30 วัน ของที่เคย “น่าทำ” อาจเปลี่ยนไปแล้ว กด ↻ เพื่อเช็คใหม่";
+      container.prepend(b);
+    }
+
+    container.querySelectorAll("tr[onclick]").forEach(function(tr) {
+      var m = String(tr.getAttribute("onclick")).match(/showDetail\((\d+)\)/);
+      if (!m) return;
+      var id = Number(m[1]);
+      var rec = data.find(function(r) { return r.id === id; });
+      if (!rec) return;
+
+      var lastTd = tr.querySelector("td:last-child");
+      if (lastTd && !lastTd.querySelector(".row-rescan")) {
+        var btn = document.createElement("button");
+        btn.className = "row-rescan";
+        btn.title = "เช็คตัวเลขใหม่";
+        btn.textContent = "↻";
+        btn.onclick = function(ev) { ev.stopPropagation(); window.rescanProduct(id); };
+        lastTd.prepend(btn);
+      }
+
+      var prodTd = tr.querySelector("td.product");
+      if (!prodTd) return;
+
+      if (info.staleByRowId[id] !== undefined && !prodTd.querySelector(".stale-badge")) {
+        var sp = document.createElement("span");
+        sp.className = "stale-badge";
+        sp.textContent = "🕐 " + info.staleByRowId[id] + "d";
+        sp.title = "ข้อมูลเก่า " + info.staleByRowId[id] + " วัน — ควรเช็คใหม่";
+        prodTd.appendChild(sp);
+      }
+
+      if (rec.outcome && rec.outcome.posted && !prodTd.querySelector(".outcome-mark")) {
+        var om = document.createElement("span");
+        om.className = "outcome-mark";
+        om.textContent = rec.outcome.gotOrder ? "💰" : "📤";
+        om.title = rec.outcome.gotOrder ? "ขายได้จริง" : "โพสต์แล้ว รอผล";
+        prodTd.appendChild(om);
+      }
+    });
+
+    // Hit-rate จริง: เทียบคำทายของระบบกับผลขายจริง (ต้องมี ≥3 ผลโพสต์)
+    var posted = data.filter(function(r) { return r.outcome && r.outcome.posted && r.outcome.gotOrder !== undefined; });
+    var hr = document.getElementById("tiHitRate");
+    var sub = document.getElementById("tiHitRateSub");
+    if (posted.length >= 3 && hr && sub) {
+      var correct = posted.filter(function(r) {
+        var predictedWin = r.decision === "PICK" || r.decision === "VALIDATED";
+        return (predictedWin && r.outcome.gotOrder) || (!predictedWin && !r.outcome.gotOrder);
+      });
+      hr.textContent = Math.round(correct.length / posted.length * 100) + "%";
+      sub.innerHTML = "ระบบทายถูกจริง — จาก <strong>" + posted.length + "</strong> ตัวที่บันทึกผล";
+    } else if (posted.length === 0 && sub && !sub.dataset.ocHint) {
+      sub.dataset.ocHint = "1";
+      sub.innerHTML += ' <span style="color:var(--red);">• กดสินค้าเพื่อบันทึกผลขายจริง → ระบบจะโชว์ความแม่นจริง</span>';
+    }
+  }
+
+  var __origRenderTracker = window.renderTracker;
+  if (typeof __origRenderTracker === "function") {
+    window.renderTracker = function patchedRenderTracker() {
+      var out = __origRenderTracker.apply(this, arguments);
+      try { enhanceTrackerDOM(); } catch (e) { console.warn("[retention] enhance error:", e); }
+      return out;
+    };
+  }
+
+  // เผื่อ tracker ถูก render ไปแล้วก่อน patch นี้โหลด
+  setTimeout(function() {
+    try { enhanceTrackerDOM(); } catch (e) {}
+  }, 800);
+})();
+</script>
 </body>
 </html>
