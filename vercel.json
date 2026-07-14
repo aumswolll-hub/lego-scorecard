@@ -4,5 +4,8 @@
   "outputDirectory": ".",
   "rewrites": [
     { "source": "/(.*)", "destination": "/$1" }
+  ],
+  "crons": [
+    { "path": "/api/digest-cron", "schedule": "0 2 * * 1" }
   ]
 }
