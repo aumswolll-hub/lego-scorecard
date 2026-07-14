@@ -2,6 +2,7 @@
   "name": "lego-scorecard",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "test": "node --test api/"
   },
