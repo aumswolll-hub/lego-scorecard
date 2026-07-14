@@ -33,9 +33,13 @@ function weekKey() {
 }
 
 async function classifyNames(names) {
-  const prompt = `จัดหมวดสินค้า TikTok Shop ต่อไปนี้ลงหมวดใดหมวดหนึ่งเท่านั้น: ${JSON.stringify(CATEGORIES)}
-ตอบเป็น JSON เท่านั้น รูปแบบ {"ชื่อสินค้า":"หมวด"} ครบทุกชื่อ:
-${JSON.stringify(names)}`;
+  // ตอบเป็น array ของ index หมวด (ตามลำดับ input) — output สั้นมาก
+  // ไม่มีทางโดน max_tokens ตัด และไม่ต้อง match ชื่อไทยยาวๆ เป็น key
+  const catList = CATEGORIES.map((c, i) => `${i}=${c}`).join(", ");
+  const nameList = names.map((n, i) => `${i + 1}. ${n}`).join("\n");
+  const prompt = `หมวดสินค้า: ${catList}
+จัดหมวดสินค้า TikTok Shop ทีละรายการ ตอบเป็น JSON array ของตัวเลข index หมวดเท่านั้น ยาวเท่าจำนวนรายการ (${names.length} ตัว) เช่น [0,3,1,...]:
+${nameList}`;
 
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -56,7 +60,17 @@ ${JSON.stringify(names)}`;
   const data = await res.json();
   const text = (data.content || []).filter((b) => b.type === "text").map((b) => b.text).join("")
     .replace(/```json/gi, "").replace(/```/g, "").trim();
-  return JSON.parse(text);
+  const indexes = JSON.parse(text);
+  if (!Array.isArray(indexes)) throw new Error("classify: not an array");
+
+  const map = {};
+  names.forEach((n, i) => {
+    const idx = Number(indexes[i]);
+    if (Number.isInteger(idx) && idx >= 0 && idx < CATEGORIES.length) {
+      map[n] = CATEGORIES[idx];
+    }
+  });
+  return map;
 }
 
 async function computePulse() {
