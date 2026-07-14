@@ -6178,6 +6178,192 @@ updateAll();
   setTimeout(function() {
     try { enhanceTrackerDOM(); } catch (e) {}
   }, 800);
+
+  /* ── ANGLE BRIDGE: ผลสแกน → 3 มุมคอนเทนต์ ─────
+     สะพานจาก "รู้ว่าน่าทำ" ไป "รู้ว่าจะถ่ายคลิปยังไง" — มุมมาจาก winning
+     patterns ของ LEGO METHOD + ตัวเลขจริงของสินค้าตัวนั้น */
+  var angleCss = document.createElement("style");
+  angleCss.textContent = [
+    ".angle-btn { display:block; width:100%; margin-top:14px; padding:13px 18px; background:transparent; border:1.5px solid var(--ink); color:var(--ink); font-family:'Noto Sans Thai',sans-serif; font-weight:600; font-size:13.5px; cursor:pointer; letter-spacing:.03em; }",
+    ".angle-btn:hover { background:var(--ink); color:var(--cream); }",
+    ".angle-btn:disabled { opacity:.5; cursor:wait; }",
+    "#angleResults { margin-top:14px; }",
+    ".angle-card { border:1.5px solid var(--grey-line); padding:14px 16px; margin-bottom:10px; background:var(--cream); }",
+    ".angle-card .an-name { font-weight:700; font-size:13.5px; margin-bottom:2px; }",
+    ".angle-card .an-pattern { display:inline-block; font-size:10px; letter-spacing:.08em; color:#9a7320; border:1px solid var(--gold); padding:1px 7px; margin-bottom:8px; }",
+    ".angle-card .an-hook { font-size:14px; line-height:1.55; margin-bottom:8px; padding:10px 12px; background:rgba(200,49,43,.06); border-left:3px solid var(--red); }",
+    ".angle-card .an-dir { font-size:12.5px; color:var(--ink-mute); line-height:1.55; }",
+    ".an-copy { float:right; background:transparent; border:1px solid var(--grey-line); font-size:10.5px; padding:2px 8px; cursor:pointer; color:var(--ink-mute); }",
+    ".an-copy:hover { border-color:var(--ink); color:var(--ink); }",
+  ].join("\n");
+  document.head.appendChild(angleCss);
+
+  function collectCurrentMetrics() {
+    function num2(id) {
+      var el = document.getElementById(id);
+      if (!el || el.value === "") return undefined;
+      var n = Number(String(el.value).replace(/,/g, ""));
+      return isFinite(n) ? n : undefined;
+    }
+    if (typeof currentMode !== "undefined" && currentMode === "discovery") {
+      return {
+        commission: num2("commission"), gmv_growth_7d: num2("gmv7"), gmv_growth_30d: num2("gmv30"),
+        creators: num2("creators"), creator_cr: num2("cr"), sales_concentration: num2("conc")
+      };
+    }
+    return {
+      commission_pct: num2("v_commission"),
+      orders_7d: num2("v_orders7"), orders_30d: num2("v_orders30"),
+      ctr_pct: num2("v_ctr"), atc_7d: num2("v_atc7"), atc_30d: num2("v_atc30"),
+      creators_7d: num2("v_creators7"), creators_30d: num2("v_creators30"),
+      stock: num2("v_stock")
+    };
+  }
+
+  function renderAngles(host, product, angles) {
+    var box = document.createElement("div");
+    box.id = "angleResults";
+    box.innerHTML = angles.map(function(a, i) {
+      var hookEsc = a.hook.replace(/"/g, "&quot;");
+      return '<div class="angle-card">' +
+        '<button class="an-copy" onclick="navigator.clipboard.writeText(this.dataset.h).then(function(){});this.textContent=\'copied ✓\'" data-h="' + hookEsc + '">copy hook</button>' +
+        '<div class="an-name">มุมที่ ' + (i + 1) + ': ' + escapeHTML(a.name) + '</div>' +
+        '<span class="an-pattern">' + escapeHTML(a.pattern) + '</span>' +
+        '<div class="an-hook">“' + escapeHTML(a.hook) + '”</div>' +
+        '<div class="an-dir">' + escapeHTML(a.direction) + '</div>' +
+        '</div>';
+    }).join("");
+    var old = document.getElementById("angleResults");
+    if (old) old.remove();
+    host.appendChild(box);
+  }
+
+  window.generateAngles = async function generateAngles(btn, source, recordId) {
+    var product, metrics, decision, host;
+
+    if (source === "record") {
+      var r = getTracker().find(function(x) { return x.id === recordId; });
+      if (!r) return;
+      product = r.product;
+      decision = r.decision;
+      metrics = r.mode === "validation"
+        ? { commission_pct: r.v_commission, orders_7d: r.v_orders7, orders_30d: r.v_orders30, ctr_pct: r.v_ctr, atc_7d: r.v_atc7, atc_30d: r.v_atc30, stock: r.v_stock }
+        : { commission: r.commission, gmv_growth_7d: r.gmv7, gmv_growth_30d: r.gmv30 };
+      host = document.getElementById("outcomeSection") || btn.parentElement;
+    } else {
+      product = (document.getElementById("productName") || {}).value || "";
+      product = product.trim();
+      if (!product) {
+        if (typeof showToast === "function") showToast("ใส่ชื่อสินค้าก่อนสร้างมุม");
+        return;
+      }
+      metrics = collectCurrentMetrics();
+      decision = (document.getElementById("decisionDisplay") || {}).textContent || "";
+      host = btn.parentElement;
+    }
+
+    var origText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "กำลังคิดมุมจากตัวเลขจริง…";
+
+    try {
+      var token = (window.currentSession && window.currentSession.token) || "";
+      var res = await fetch("/api/generate-angles", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-session-token": token },
+        body: JSON.stringify({ product_name: product, decision: decision, metrics: metrics })
+      });
+      var data = await res.json().catch(function() { return {}; });
+
+      if (!res.ok || !data.angles) {
+        if (typeof showToast === "function") showToast(data.message || "สร้างมุมไม่สำเร็จ ลองใหม่");
+        return;
+      }
+
+      renderAngles(host, product, data.angles);
+      if (typeof showToast === "function") showToast("ได้ 3 มุมสำหรับ “" + product + "” — เก็บใน Tracker ให้แล้ว");
+    } catch (e) {
+      if (typeof showToast === "function") showToast("สร้างมุมไม่สำเร็จ ลองใหม่อีกครั้ง");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = origText;
+    }
+  };
+
+  // ปุ่มในหน้า Scorecard: วางท้าย result-block (โผล่พร้อมผลตรวจ)
+  function injectAngleButton() {
+    var rb = document.querySelector(".result-block");
+    if (!rb || document.getElementById("angleBtnMain")) return;
+    var b = document.createElement("button");
+    b.id = "angleBtnMain";
+    b.className = "angle-btn";
+    b.textContent = "🎬 สร้างมุมคอนเทนต์ 3 มุมจากตัวเลขนี้";
+    b.onclick = function() { window.generateAngles(b, "form"); };
+    rb.appendChild(b);
+  }
+  setTimeout(injectAngleButton, 600);
+  setInterval(injectAngleButton, 3000);
+
+  /* ── MARKET PULSE strip: ข่าวกรองรวมจากนักเรียนทุกคน ── */
+  var pulseCss = document.createElement("style");
+  pulseCss.textContent =
+    "#marketPulse { border:1.5px solid var(--ink); background:var(--cream); padding:11px 16px; margin:0 0 18px; font-size:12.5px; line-height:1.6; display:none; }" +
+    "#marketPulse .mp-tag { font-weight:700; letter-spacing:.1em; font-size:10.5px; color:var(--red); margin-right:8px; }";
+  document.head.appendChild(pulseCss);
+
+  async function loadMarketPulse() {
+    var token = (window.currentSession && window.currentSession.token) || "";
+    if (!token) { setTimeout(loadMarketPulse, 2500); return; }
+
+    try {
+      var cached = JSON.parse(sessionStorage.getItem("lego_pulse") || "null");
+      var pulse = null;
+      if (cached && Date.now() - cached.at < 6 * 3600000) {
+        pulse = cached.pulse;
+      } else {
+        var res = await fetch("/api/market-pulse", { headers: { "x-session-token": token } });
+        if (!res.ok) return;
+        var data = await res.json();
+        pulse = data.pulse;
+        sessionStorage.setItem("lego_pulse", JSON.stringify({ at: Date.now(), pulse: pulse }));
+      }
+      if (!pulse || !pulse.total_scans) return;
+
+      var header = document.querySelector("#view-scorecard .page-header");
+      if (!header) return;
+      var el = document.getElementById("marketPulse");
+      if (!el) {
+        el = document.createElement("div");
+        el.id = "marketPulse";
+        header.insertAdjacentElement("afterend", el);
+      }
+      var bits = ['<span class="mp-tag">📡 ตลาดรอบ ' + pulse.window_days + ' วัน</span>',
+        'สแกนรวม <strong>' + pulse.total_scans + '</strong> ครั้ง',
+        'ผ่านเกณฑ์ <strong>' + pulse.pick_rate + '%</strong>'];
+      if (pulse.hot) bits.push('หมวดร้อน: <strong>' + escapeHTML(pulse.hot.category) + '</strong> (ผ่าน ' + pulse.hot.pick_rate + '%)');
+      if (pulse.cold) bits.push('หมวดเย็น: ' + escapeHTML(pulse.cold.category) + ' (' + pulse.cold.pick_rate + '%)');
+      el.innerHTML = bits.join(" · ");
+      el.style.display = "block";
+    } catch (e) {}
+  }
+  setTimeout(loadMarketPulse, 1500);
+
+  // ปุ่มใน detail modal (เฉพาะตัวที่ผ่านเกณฑ์)
+  var __origInjectOutcome = injectOutcomeUI;
+  injectOutcomeUI = function(id) {
+    __origInjectOutcome(id);
+    var r = getTracker().find(function(x) { return x.id === id; });
+    var oc = document.getElementById("outcomeSection");
+    if (!r || !oc) return;
+    if (r.decision === "VALIDATED" || r.decision === "PICK") {
+      var b = document.createElement("button");
+      b.className = "angle-btn";
+      b.style.marginTop = "10px";
+      b.textContent = "🎬 สร้างมุมคอนเทนต์ 3 มุม";
+      b.onclick = function() { window.generateAngles(b, "record", id); };
+      oc.appendChild(b);
+    }
+  };
 })();
 </script>
 </body>

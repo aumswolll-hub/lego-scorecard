@@ -113,7 +113,16 @@ function summarize(u, trackerRows) {
   };
 }
 
-function emailHtml(email, s) {
+function pulseBlock(pulse) {
+  if (!pulse || !pulse.total_scans) return "";
+  const hot = pulse.hot ? `หมวดร้อน: <strong>${pulse.hot.category}</strong> (ผ่านเกณฑ์ ${pulse.hot.pick_rate}%)` : "";
+  const cold = pulse.cold ? ` · หมวดเย็น: ${pulse.cold.category} (${pulse.cold.pick_rate}%)` : "";
+  return `<div style="border:1.5px solid #0F0F0F; padding:12px 16px; margin:0 0 16px; font-size:13px; line-height:1.6;">
+    📡 <strong>ตลาดรอบ ${pulse.window_days} วัน</strong> (จากนักเรียนทุกคน): สแกน ${pulse.total_scans} ครั้ง · ผ่านเกณฑ์ ${pulse.pick_rate}%<br>${hot}${cold}
+  </div>`;
+}
+
+function emailHtml(email, s, pulse) {
   const base = appUrl();
   const unsub = `${base}/api/digest-unsubscribe?email=${encodeURIComponent(email)}&sig=${unsubscribeSig(email)}`;
 
@@ -141,6 +150,7 @@ function emailHtml(email, s) {
       ${staleBlock}
       ${winnersBlock}
       ${accuracyBlock}
+      ${pulseBlock(pulse)}
       <a href="${base}/?utm_source=digest" style="display:inline-block; background:#C8312B; color:#F5EFE6; padding:13px 28px; text-decoration:none; font-weight:600; font-size:13px; letter-spacing:0.08em;">เปิด SCANNER →</a>
       <p style="color:#6B6B6B; font-size:11px; margin-top:32px; padding-top:20px; border-top:1px solid #D9D2C5;">
         อีเมลนี้ส่งสัปดาห์ละครั้งถึงผู้ใช้ LEGO Scanner ที่มีสินค้าในระบบ ·
@@ -168,7 +178,7 @@ export default async function handler(req, res) {
   try {
     const since = new Date(Date.now() - ACTIVE_WINDOW_DAYS * 86400000).toISOString();
 
-    const [scansRes, trackerRes, prefsRes] = await Promise.all([
+    const [scansRes, trackerRes, prefsRes, pulseRes] = await Promise.all([
       sb(
         `product_scans?created_at=gte.${encodeURIComponent(since)}` +
           `&select=user_email,product_name,decision,score_pct,created_at` +
@@ -176,7 +186,11 @@ export default async function handler(req, res) {
       ),
       sb(`user_product_tracker?select=user_email,user_status`),
       sb(`scanner_email_prefs?digest_enabled=eq.false&select=email`),
+      sb(`market_pulse_cache?select=payload&order=updated_at.desc&limit=1`),
     ]);
+
+    const pulseRows = pulseRes.ok ? await pulseRes.json() : [];
+    const pulse = pulseRows.length ? pulseRows[0].payload : null;
 
     if (!scansRes.ok) throw new Error(`scans query ${scansRes.status}`);
 
@@ -221,7 +235,7 @@ export default async function handler(req, res) {
           subject: s.staleCount
             ? `🕐 ${s.staleCount} สินค้าของคุณรอเช็คใหม่ — LEGO Scanner Weekly`
             : `พอร์ตสินค้าของคุณสัปดาห์นี้ — LEGO Scanner Weekly`,
-          html: emailHtml(email, s),
+          html: emailHtml(email, s, pulse),
         });
         if (error) throw new Error(error.message || "send_failed");
         sent++;
