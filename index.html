@@ -1437,39 +1437,22 @@ body.result-locked .result-block::after {
   <div class="login-card">
     <div class="login-mark">LEGO METHOD™ · SCANNER</div>
 
-    <h1 class="serif">สินค้านี้<br><em>น่าทำไหม?</em></h1>
-    <p class="sub">อัปโหลดภาพ Promotion Info จาก TikTok Shop → AI อ่านตัวเลขให้ → รู้ใน 10 วินาทีว่าควร <strong style="color:var(--ink)">ทำ / ลองก่อน / ข้าม</strong></p>
-
-    <!-- สิ่งที่คุณจะได้ (ผลลัพธ์) -->
-    <div style="display:flex; gap:8px; margin:0 0 28px;">
-      <span style="flex:1; text-align:center; border:1.5px solid #1E8E5A; color:#1E8E5A; font-weight:600; font-size:13px; padding:9px 4px;">● ทำเลย</span>
-      <span style="flex:1; text-align:center; border:1.5px solid var(--gold); color:#9a7320; font-weight:600; font-size:13px; padding:9px 4px;">● ลองก่อน</span>
-      <span style="flex:1; text-align:center; border:1.5px solid var(--red); color:var(--red); font-weight:600; font-size:13px; padding:9px 4px;">● ข้ามก่อน</span>
-    </div>
-
-    <!-- 3 ขั้นตอน -->
-    <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:32px;">
-      <div style="text-align:center;"><div style="font-family:'Fraunces',serif; font-weight:900; font-size:26px; color:var(--gold); line-height:1;">1</div><div style="font-size:12px; color:var(--ink-mute); line-height:1.4; margin-top:6px;">สมัครฟรี<br>ด้วยอีเมล</div></div>
-      <div style="text-align:center;"><div style="font-family:'Fraunces',serif; font-weight:900; font-size:26px; color:var(--gold); line-height:1;">2</div><div style="font-size:12px; color:var(--ink-mute); line-height:1.4; margin-top:6px;">อัปโหลดภาพ<br>สินค้า 2 รูป</div></div>
-      <div style="text-align:center;"><div style="font-family:'Fraunces',serif; font-weight:900; font-size:26px; color:var(--gold); line-height:1;">3</div><div style="font-size:12px; color:var(--ink-mute); line-height:1.4; margin-top:6px;">รู้คะแนน<br>+ คำแนะนำ</div></div>
-    </div>
+    <h1 class="serif">เข้าสู่<br><em>ระบบ</em></h1>
+    <p class="sub">ใส่อีเมล + รหัสผ่าน แล้วกด “เข้าสู่ระบบ” ได้เลย<br>ยังไม่เคยมีบัญชี — ระบบสมัครให้อัตโนมัติ</p>
 
     <label class="field-label" for="emailInput">อีเมล</label>
     <input type="email" id="emailInput" placeholder="you@example.com" autocomplete="email">
 
     <label class="field-label" for="passwordInput" style="margin-top:18px;">รหัสผ่าน</label>
-    <input type="password" id="passwordInput" placeholder="ตั้งรหัสผ่านอย่างน้อย 6 ตัวอักษร" autocomplete="current-password">
+    <input type="password" id="passwordInput" placeholder="อย่างน้อย 6 ตัวอักษร" autocomplete="current-password">
 
     <div class="login-error" id="loginError"></div>
     <div class="login-success" id="loginSuccess"></div>
 
-    <button class="login-btn" id="signupBtn" type="button" onclick="signupFreeAccount()">สร้างบัญชีใช้ฟรี 3 ครั้ง →</button>
-    <button class="login-btn lego-auth-secondary-btn" id="loginBtn" type="button" onclick="loginWithPassword()">เข้าสู่ระบบ (ลูกค้าเก่า)</button>
+    <button class="login-btn" id="loginBtn" type="button" onclick="smartAuth()">เข้าสู่ระบบ →</button>
     <button class="login-btn lego-auth-link-btn" id="resetBtn" type="button" onclick="resetPasswordFromIndex()">ลืมรหัสผ่าน / ตั้งรหัสผ่านใหม่</button>
 
-    <p style="text-align:center; font-size:12px; color:var(--ink-mute); margin:18px 0 0;">นักเรียน LEGO METHOD ใช้เลือกสินค้าแม่นขึ้นทุกวัน</p>
-
-    <p class="hint"><strong>ฟรี 3 ครั้ง</strong> · ไม่ต้องผูกบัตร · ใช้ข้อมูลจริงจาก TikTok Shop<br>ลูกค้าเก่า / เคยใช้ Magic Link — ใส่อีเมลเดิม กด “เข้าสู่ระบบ” (ยังไม่มีรหัสผ่าน กด “ลืมรหัสผ่าน” เพื่อตั้งใหม่) ระบบปลดล็อกสิทธิ์ให้อัตโนมัติ</p>
+    <p class="hint">ลูกค้าเก่า / เคยใช้ Magic Link — ใส่อีเมลเดิม + ตั้งรหัสผ่านใหม่ แล้วกด “เข้าสู่ระบบ” ระบบปลดล็อกสิทธิ์เดิมให้อัตโนมัติ</p>
   </div>
 </div>
 
@@ -2223,7 +2206,8 @@ async function requestMagicLink() {
   } catch (e) { err.textContent = "เกิดข้อผิดพลาด — ลองใหม่"; }
   finally { btn.disabled = false; btn.textContent = "ลองตรวจสินค้าฟรี 3 ครั้ง"; }
 }
-document.getElementById("emailInput").addEventListener("keypress", e => { if (e.key === "Enter") requestMagicLink(); });
+// (ถอด Enter → requestMagicLink เดิมออก — magic link เลิกใช้แล้ว และ handler นี้
+// เคยชนกับ flow รหัสผ่านใหม่ ทำให้กด Enter แล้วยิงอีเมลผิดประเภท)
 
 async function verifyToken(token) {
   document.getElementById("loginScreen").style.display = "none";
@@ -5476,37 +5460,22 @@ updateAll();
     loginCard.innerHTML = `
       <div class="login-mark">LEGO METHOD™ · SCANNER</div>
 
-      <h1 class="serif">สินค้านี้<br><em>น่าทำไหม?</em></h1>
-      <p class="sub">อัปโหลดภาพ Promotion Info จาก TikTok Shop → AI อ่านตัวเลขให้ → รู้ใน 10 วินาทีว่าควร <strong style="color:var(--ink)">ทำ / ลองก่อน / ข้าม</strong></p>
-
-      <div style="display:flex; gap:8px; margin:0 0 28px;">
-        <span style="flex:1; text-align:center; border:1.5px solid #1E8E5A; color:#1E8E5A; font-weight:600; font-size:13px; padding:9px 4px;">● ทำเลย</span>
-        <span style="flex:1; text-align:center; border:1.5px solid var(--gold); color:#9a7320; font-weight:600; font-size:13px; padding:9px 4px;">● ลองก่อน</span>
-        <span style="flex:1; text-align:center; border:1.5px solid var(--red); color:var(--red); font-weight:600; font-size:13px; padding:9px 4px;">● ข้ามก่อน</span>
-      </div>
-
-      <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:32px;">
-        <div style="text-align:center;"><div style="font-family:'Fraunces',serif; font-weight:900; font-size:26px; color:var(--gold); line-height:1;">1</div><div style="font-size:12px; color:var(--ink-mute); line-height:1.4; margin-top:6px;">สมัครฟรี<br>ด้วยอีเมล</div></div>
-        <div style="text-align:center;"><div style="font-family:'Fraunces',serif; font-weight:900; font-size:26px; color:var(--gold); line-height:1;">2</div><div style="font-size:12px; color:var(--ink-mute); line-height:1.4; margin-top:6px;">อัปโหลดภาพ<br>สินค้า 2 รูป</div></div>
-        <div style="text-align:center;"><div style="font-family:'Fraunces',serif; font-weight:900; font-size:26px; color:var(--gold); line-height:1;">3</div><div style="font-size:12px; color:var(--ink-mute); line-height:1.4; margin-top:6px;">รู้คะแนน<br>+ คำแนะนำ</div></div>
-      </div>
+      <h1 class="serif">เข้าสู่<br><em>ระบบ</em></h1>
+      <p class="sub">ใส่อีเมล + รหัสผ่าน แล้วกด “เข้าสู่ระบบ” ได้เลย<br>ยังไม่เคยมีบัญชี — ระบบสมัครให้อัตโนมัติ</p>
 
       <label class="field-label" for="emailInput">อีเมล</label>
       <input type="email" id="emailInput" placeholder="you@example.com" autocomplete="email">
 
       <label class="field-label" for="passwordInput" style="margin-top:18px;">รหัสผ่าน</label>
-      <input type="password" id="passwordInput" placeholder="ตั้งรหัสผ่านอย่างน้อย 6 ตัวอักษร" autocomplete="current-password">
+      <input type="password" id="passwordInput" placeholder="อย่างน้อย 6 ตัวอักษร" autocomplete="current-password">
 
       <div class="login-error" id="loginError"></div>
       <div class="login-success" id="loginSuccess"></div>
 
-      <button class="login-btn" id="signupBtn" type="button" onclick="signupFreeAccount()">สร้างบัญชีใช้ฟรี 3 ครั้ง →</button>
-      <button class="login-btn lego-auth-secondary-btn" id="loginBtn" type="button" onclick="loginWithPassword()">เข้าสู่ระบบ (ลูกค้าเก่า)</button>
+      <button class="login-btn" id="loginBtn" type="button" onclick="smartAuth()">เข้าสู่ระบบ →</button>
       <button class="login-btn lego-auth-link-btn" id="resetBtn" type="button" onclick="resetPasswordFromIndex()">ลืมรหัสผ่าน / ตั้งรหัสผ่านใหม่</button>
 
-      <p style="text-align:center; font-size:12px; color:var(--ink-mute); margin:18px 0 0;">นักเรียน LEGO METHOD ใช้เลือกสินค้าแม่นขึ้นทุกวัน</p>
-
-      <p class="hint"><strong>ฟรี 3 ครั้ง</strong> · ไม่ต้องผูกบัตร · ใช้ข้อมูลจริงจาก TikTok Shop<br>ลูกค้าเก่า / เคยใช้ Magic Link — ใส่อีเมลเดิม กด “เข้าสู่ระบบ” (ยังไม่มีรหัสผ่าน กด “ลืมรหัสผ่าน” เพื่อตั้งใหม่) ระบบปลดล็อกสิทธิ์ให้อัตโนมัติ</p>
+      <p class="hint">ลูกค้าเก่า / เคยใช้ Magic Link — ใส่อีเมลเดิม + ตั้งรหัสผ่านใหม่ แล้วกด “เข้าสู่ระบบ” ระบบปลดล็อกสิทธิ์เดิมให้อัตโนมัติ</p>
     `;
 
     const emailInput = $("emailInput");
@@ -5514,15 +5483,9 @@ updateAll();
   }
 
   function showLoginScreenSafely() {
-    patchLoginUI();
-
-    const loginScreen = $("loginScreen");
-    const verifyScreen = $("verifyScreen");
-    const app = $("app");
-
-    if (verifyScreen) verifyScreen.style.display = "none";
-    if (app) app.classList.remove("active");
-    if (loginScreen) loginScreen.style.display = "grid";
+    // login.html คือหน้า login หลักตัวเดียว — index ไม่แสดง login card เองแล้ว
+    // (ใช้ replace กัน back button เด้งกลับมาหน้าว่าง)
+    window.location.replace("/login.html");
   }
 
   async function getCurrentSupabaseSession() {
@@ -5706,6 +5669,101 @@ updateAll();
     }
   };
 
+  // Enter = ทางเดียวจบ: ลอง login ก่อน ถ้ายังไม่มีบัญชีสมัครให้อัตโนมัติ
+  // (สิทธิ์ผูกกับอีเมล — ลูกค้าเก่าที่ยังไม่มีบัญชีรหัสผ่านจะได้สิทธิ์เดิมทันที)
+  window.smartAuth = async function smartAuth() {
+    const input = validateEmailPassword(true);
+    if (!input) return;
+
+    const sb = getSupabaseClient();
+    if (!sb) return;
+
+    setAuthButtonsDisabled(true);
+    showAuthSuccess("กำลังเข้าสู่ระบบ...");
+
+    try {
+      const { data, error } = await sb.auth.signInWithPassword({
+        email: input.email,
+        password: input.password
+      });
+
+      if (!error && data && data.session && data.session.access_token) {
+        const sessionObj = createSessionObject(input.email, data.session.access_token);
+        showAuthSuccess("เข้าสู่ระบบสำเร็จ กำลังเปิด Scanner...");
+        setTimeout(function() { showAppSafely(sessionObj); }, 400);
+        return;
+      }
+
+      const msg = String((error && error.message) || "").toLowerCase();
+
+      if (msg.includes("rate limit")) {
+        showAuthError("ระบบ Login ถี่เกินไป กรุณารอสักครู่แล้วลองใหม่");
+        return;
+      }
+
+      if (msg.includes("email not confirmed")) {
+        showAuthError("กรุณายืนยัน Email ก่อนเข้าใช้งาน");
+        return;
+      }
+
+      if (!msg.includes("invalid login")) {
+        showAuthError(error && error.message ? error.message : "เข้าสู่ระบบไม่สำเร็จ");
+        return;
+      }
+
+      // login ไม่ผ่าน = ยังไม่มีบัญชี หรือรหัสผิด → ลองสมัครดู
+      // สมัครสำเร็จ = คนใหม่ (หรือลูกค้าเก่าที่เพิ่งตั้งรหัสครั้งแรก) → เข้าได้เลย
+      // สมัครไม่ได้เพราะมีบัญชีแล้ว = รหัสผิดแน่นอน → บอกตรง ๆ
+      showAuthSuccess("ยังไม่พบบัญชี กำลังสมัครให้อัตโนมัติ...");
+
+      const { data: suData, error: suError } = await sb.auth.signUp({
+        email: input.email,
+        password: input.password
+      });
+
+      if (suError) {
+        const suMsg = String(suError.message || "").toLowerCase();
+
+        if (suMsg.includes("already") || suMsg.includes("registered") || suMsg.includes("exists")) {
+          showAuthError("มีบัญชีนี้อยู่แล้ว แต่รหัสผ่านไม่ถูกต้อง — ถ้าลืมรหัส กดปุ่ม “ลืมรหัสผ่าน / ตั้งรหัสผ่านใหม่” ด้านล่าง");
+          return;
+        }
+
+        if (suMsg.includes("rate limit")) {
+          showAuthError("ระบบส่ง Email ถี่เกินไป กรุณารอสักครู่แล้วลองใหม่");
+          return;
+        }
+
+        showAuthError(suError.message || "เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่");
+        return;
+      }
+
+      let session = suData && suData.session ? suData.session : null;
+
+      if (!session) {
+        const { data: siData } = await sb.auth.signInWithPassword({
+          email: input.email,
+          password: input.password
+        });
+        session = siData && siData.session ? siData.session : null;
+      }
+
+      if (session && session.access_token) {
+        const sessionObj = createSessionObject(input.email, session.access_token);
+        showAuthSuccess("สร้างบัญชีสำเร็จ กำลังเปิด Scanner...");
+        setTimeout(function() { showAppSafely(sessionObj); }, 400);
+        return;
+      }
+
+      showAuthError("สร้างบัญชีแล้ว แต่เข้าระบบอัตโนมัติไม่สำเร็จ กรุณากด “เข้าสู่ระบบ” อีกครั้ง");
+    } catch (err) {
+      console.error("[auth] smartAuth error:", err);
+      showAuthError("เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+    } finally {
+      setAuthButtonsDisabled(false);
+    }
+  };
+
   window.resetPasswordFromIndex = async function resetPasswordFromIndex() {
     const email = getEmail();
 
@@ -5773,9 +5831,18 @@ updateAll();
     const active = document.activeElement;
     if (!active) return;
 
-    if (active.id === "emailInput" || active.id === "passwordInput") {
+    // Enter ที่ช่องอีเมล → ไปช่องรหัสผ่าน / Enter ที่ช่องรหัสผ่าน → smartAuth
+    // (ห้ามผูกกับ signup/reset ตรง ๆ — เคยทำให้กด Enter แล้วสมัครบัญชีใหม่ทับ)
+    if (active.id === "emailInput") {
       e.preventDefault();
-      window.signupFreeAccount();
+      const pw = document.getElementById("passwordInput");
+      if (pw) pw.focus();
+      return;
+    }
+
+    if (active.id === "passwordInput") {
+      e.preventDefault();
+      window.smartAuth();
     }
   });
 

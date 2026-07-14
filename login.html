@@ -189,7 +189,7 @@
     <div class="login-mark">LEGO METHOD™ · SCANNER</div>
 
     <h1>เข้าสู่<br><em>ระบบ</em></h1>
-    <p>ใช้อีเมลเดียวกับที่ชำระเงิน หรือเคยได้รับสิทธิ์ใช้งาน LEGO SCANNER</p>
+    <p>ใช้อีเมลเดียวกับที่ชำระเงิน หรือเคยได้รับสิทธิ์ใช้งาน LEGO SCANNER<br>ยังไม่เคยมีบัญชี — ใส่อีเมล + ตั้งรหัสผ่าน ระบบสมัครให้อัตโนมัติ</p>
 
     <label for="email">อีเมล</label>
     <input id="email" type="email" placeholder="your@email.com" autocomplete="email" />
@@ -264,76 +264,31 @@
       }
     }
 
-    async function checkCustomerAccess() {
-      const { data: userData, error: userError } = await sb.auth.getUser();
-
-      if (userError || !userData || !userData.user) {
-        return {
-          allowed: false,
-          reason: 'not_logged_in'
-        };
-      }
-
-      const email = userData.user.email.trim().toLowerCase();
-
-      const { data: customer, error } = await sb
-        .from('customers')
-        .select('*')
-        .eq('email', email)
-        .eq('active', true)
-        .is('deactivated_at', null)
-        .maybeSingle();
-
-      if (error) {
-        console.error('Customer access error:', error);
-
-        return {
-          allowed: false,
-          reason: 'database_error',
-          error
-        };
-      }
-
-      if (!customer) {
-        return {
-          allowed: false,
-          reason: 'no_access'
-        };
-      }
-
-      return {
-        allowed: true,
-        customer
-      };
-    }
-
     async function goAfterAuth() {
-      const access = await checkCustomerAccess();
+      // มี session = เข้าแอปได้เลย — สิทธิ์/โควตาให้ /api/usage ฝั่งแอปตัดสิน
+      // (ห้ามเช็คตาราง customers ตรงจากหน้านี้ — ผู้ใช้ฟรีและลูกค้าที่สิทธิ์
+      // อยู่ layer ใหม่ไม่มีแถวใน customers จะโดนไล่ไป no-access ทั้งที่จ่ายแล้ว)
+      showMessage('เข้าสู่ระบบสำเร็จ กำลังพาไปหน้าใช้งาน...', 'success');
 
-      if (access.allowed) {
-        showMessage('เข้าสู่ระบบสำเร็จ กำลังพาไปหน้าใช้งาน...', 'success');
-
-        setTimeout(() => {
-          window.location.href = '/';
-        }, 500);
-
-        return;
-      }
-
-      if (access.reason === 'database_error') {
-        showMessage('ระบบตรวจสิทธิ์มีปัญหา กรุณาลองใหม่อีกครั้ง', 'error');
-        return;
-      }
-
-      window.location.href = '/no-access.html';
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 500);
     }
 
+    // ทางเดียวจบ: ลอง login ก่อน ถ้ายังไม่มีบัญชีสมัครให้อัตโนมัติ
+    // ถ้ามีบัญชีแต่รหัสผิด บอกตรง ๆ (สิทธิ์ผูกกับอีเมล — ลูกค้าเก่าที่ยังไม่มี
+    // บัญชีรหัสผ่านจะได้สิทธิ์เดิมทันทีที่สมัคร)
     async function login() {
       const email = getEmail();
       const password = getPassword();
 
-      if (!email || !password) {
-        showMessage('กรุณากรอกอีเมลและรหัสผ่าน', 'error');
+      if (!email || !email.includes('@')) {
+        showMessage('กรุณากรอกอีเมลให้ถูกต้อง', 'error');
+        return;
+      }
+
+      if (!password || password.length < 6) {
+        showMessage('กรุณากรอกรหัสผ่านอย่างน้อย 6 ตัวอักษร', 'error');
         return;
       }
 
@@ -346,18 +301,58 @@
           password
         });
 
-        if (error) {
-          console.error('Login error:', error);
-
-          showMessage(
-            'อีเมลหรือรหัสผ่านไม่ถูกต้อง หากยังไม่เคยตั้งรหัสผ่าน ให้กด “สร้างบัญชี / ตั้งรหัสผ่านครั้งแรก”',
-            'error'
-          );
-
+        if (!error) {
+          await goAfterAuth();
           return;
         }
 
-        await goAfterAuth();
+        const msg = String(error.message || '').toLowerCase();
+
+        if (msg.includes('rate limit')) {
+          showMessage('ระบบ Login ถี่เกินไป กรุณารอสักครู่แล้วลองใหม่', 'error');
+          return;
+        }
+
+        if (!msg.includes('invalid login')) {
+          console.error('Login error:', error);
+          showMessage(error.message || 'เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่', 'error');
+          return;
+        }
+
+        // login ไม่ผ่าน = ยังไม่มีบัญชี หรือรหัสผิด → ลองสมัครดู
+        showMessage('ยังไม่พบบัญชี กำลังสมัครให้อัตโนมัติ...');
+
+        const { data: suData, error: suError } = await sb.auth.signUp({
+          email,
+          password
+        });
+
+        if (suError) {
+          const suMsg = String(suError.message || '').toLowerCase();
+
+          if (suMsg.includes('already') || suMsg.includes('registered') || suMsg.includes('exists')) {
+            showMessage('มีบัญชีนี้อยู่แล้ว แต่รหัสผ่านไม่ถูกต้อง — ถ้าลืมรหัส กด “ลืมรหัสผ่าน?” ด้านล่าง', 'error');
+            return;
+          }
+
+          console.error('Auto-signup error:', suError);
+          showMessage(suError.message || 'เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่', 'error');
+          return;
+        }
+
+        let session = suData && suData.session ? suData.session : null;
+
+        if (!session) {
+          const { data: siData } = await sb.auth.signInWithPassword({ email, password });
+          session = siData && siData.session ? siData.session : null;
+        }
+
+        if (session) {
+          await goAfterAuth();
+          return;
+        }
+
+        showMessage('สร้างบัญชีแล้ว แต่เข้าระบบอัตโนมัติไม่สำเร็จ กรุณากด “เข้าสู่ระบบ” อีกครั้ง', 'error');
       } catch (err) {
         console.error('Login unexpected error:', err);
         showMessage('เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่อีกครั้ง', 'error');
@@ -482,6 +477,13 @@
       const ok = initSupabase();
 
       if (!ok) return;
+
+      // login ค้างอยู่แล้ว → เข้าแอปเลย ไม่ต้องเห็นหน้านี้ซ้ำ
+      sb.auth.getSession().then(function (res) {
+        if (res && res.data && res.data.session) {
+          window.location.replace('/');
+        }
+      }).catch(function () {});
 
       document.getElementById('loginBtn').addEventListener('click', login);
       document.getElementById('signupBtn').addEventListener('click', signup);
