@@ -84,7 +84,8 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model: ANTHROPIC_MODEL,
-        max_tokens: 1200,
+        // script ไทย 3-5 บีท × 3 มุม ยาว — 1200 เคยตัด JSON กลางทาง
+        max_tokens: 3000,
         temperature: 0.7,
         messages: [{ role: "user", content: ANGLE_PROMPT(product) }],
       }),
