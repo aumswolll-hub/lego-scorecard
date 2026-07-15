@@ -6225,12 +6225,14 @@ updateAll();
     box.id = "angleResults";
     box.innerHTML = angles.map(function(a, i) {
       var hookEsc = a.hook.replace(/"/g, "&quot;");
+      var scriptHtml = escapeHTML(a.script || "").replace(/\s*\/\s*บีท/g, "<br>บีท");
       return '<div class="angle-card">' +
         '<button class="an-copy" onclick="navigator.clipboard.writeText(this.dataset.h).then(function(){});this.textContent=\'copied ✓\'" data-h="' + hookEsc + '">copy hook</button>' +
         '<div class="an-name">มุมที่ ' + (i + 1) + ': ' + escapeHTML(a.name) + '</div>' +
-        '<span class="an-pattern">' + escapeHTML(a.pattern) + '</span>' +
+        '<span class="an-pattern">' + escapeHTML(a.angle_type || a.pattern || "") + '</span>' +
+        (a.pain ? '<div class="an-dir" style="margin-bottom:8px;">💢 <strong>Pain:</strong> ' + escapeHTML(a.pain) + '</div>' : '') +
         '<div class="an-hook">“' + escapeHTML(a.hook) + '”</div>' +
-        '<div class="an-dir">' + escapeHTML(a.direction) + '</div>' +
+        '<div class="an-dir"><strong>Script:</strong><br>' + (scriptHtml || escapeHTML(a.direction || "")) + '</div>' +
         '</div>';
     }).join("");
     var old = document.getElementById("angleResults");
