@@ -18,9 +18,10 @@ export const config = {
 };
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-// Haiku 4.5 = เร็วกว่า sonnet ~3-4 เท่า (founder: "gen นานเกินไป" 2026-07-21)
-// จงใจไม่ fallback ไป ANTHROPIC_MODEL — ตัวนั้นคือ sonnet ของ analyze-image (อ่านตัวเลขต้องแม่น)
-const ANTHROPIC_MODEL = process.env.SELLKIT_MODEL || "claude-haiku-4-5-20251001";
+// Sonnet = คุณภาพมุมขาย (founder ลอง haiku 2026-07-21 แล้ว "มุมจืดลง" — สลับกลับ)
+// ความเร็วยังโอเคเพราะสถาปัตยกรรมยิงขนาน + แยก stage อยู่แล้ว (~1:40 สำหรับ 30 มุม)
+// prefill "{" + parseAiJson คงไว้ — ใช้ได้กับทุก model
+const ANTHROPIC_MODEL = process.env.SELLKIT_MODEL || "claude-sonnet-4-6";
 const DEBUG_SCANNER = process.env.DEBUG_SCANNER === "true";
 const MAX_IMAGES = 15;
 
@@ -316,40 +317,46 @@ ${SHARED_RULES}
 }
 
 async function callClaude(content, maxTokens) {
-  const aiRes = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "x-api-key": ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: ANTHROPIC_MODEL,
-      max_tokens: maxTokens,
-      temperature: 0.7,
-      messages: [
-        { role: "user", content },
-        // prefill บังคับให้เริ่มตอบเป็น JSON ทันที (haiku ชอบเปิดด้วยข้อความ)
-        { role: "assistant", content: "{" },
-      ],
-    }),
-  });
+  // retry 1 ครั้งเมื่อเจอ 429/5xx (Anthropic transient — เจอจริง 1/3 calls ตอน E2E 2026-07-21)
+  for (let attempt = 0; ; attempt++) {
+    const aiRes = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: ANTHROPIC_MODEL,
+        max_tokens: maxTokens,
+        temperature: 0.7,
+        // หมายเหตุ: ห้ามใช้ assistant prefill — sonnet 4.6 ไม่รองรับ (400) ใช้ parseAiJson พอ
+        messages: [{ role: "user", content }],
+      }),
+    });
 
-  if (!aiRes.ok) {
+    if (aiRes.ok) {
+      const aiData = await aiRes.json();
+      return (aiData.content || [])
+        .filter((b) => b.type === "text")
+        .map((b) => b.text)
+        .join("")
+        .trim();
+    }
+
     const errTxt = await aiRes.text();
+    const retryable = aiRes.status === 429 || aiRes.status >= 500;
+    if (retryable && attempt === 0) {
+      console.warn(`[sell-kit] Claude ${aiRes.status} — retrying once`);
+      await new Promise((r) => setTimeout(r, 2500));
+      continue;
+    }
+
     const err = new Error(`claude_${aiRes.status}`);
     err.status = aiRes.status;
     err.detail = errTxt.slice(0, 500);
     throw err;
   }
-
-  const aiData = await aiRes.json();
-  const text = (aiData.content || [])
-    .filter((b) => b.type === "text")
-    .map((b) => b.text)
-    .join("")
-    .trim();
-  return "{" + text;
 }
 
 export default async function handler(req, res) {

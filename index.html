@@ -3722,7 +3722,7 @@ async function generateSellKit() {
   const btn = document.getElementById("sellkitBtn");
   sellkitBusy = true;
   btn.disabled = true;
-  btn.textContent = "⟳ กำลังอ่านภาพ + แตกมุมขาย... (~15-30 วิ)";
+  btn.textContent = "⟳ กำลังอ่านภาพ + แตกมุมขาย... (~30-60 วิ)";
   status.innerHTML = "AI กำลังอ่านรูปทั้งหมด วิเคราะห์ตลาด และแตกมุมขาย 5 มุม";
 
   try {
@@ -3848,7 +3848,7 @@ async function sellkitMakeScript(i) {
 
   btn.disabled = true;
   const orig = btn.textContent;
-  btn.textContent = "⟳ กำลังเขียน... (~10-15 วิ)";
+  btn.textContent = "⟳ กำลังเขียน... (~20-30 วิ)";
 
   try {
     const res = await fetch("/api/sell-kit", {
@@ -3976,7 +3976,7 @@ async function sellkitExpand() {
   btn.disabled = true;
   const orig = btn.textContent;
   btn.textContent = "⟳ กำลังแตก 30 มุม...";
-  status.innerHTML = "ขั้น 1/2 — AI 3 ตัวแตกมุมพร้อมกัน (~30-40 วิ)";
+  status.innerHTML = "ขั้น 1/2 — AI 3 ตัวแตกมุมพร้อมกัน (~1-1.5 นาที)";
 
   try {
     const [core, ae, fj] = await Promise.all([
@@ -4091,7 +4091,7 @@ async function sellkitWinScript(slotIdx, angleNo) {
 
   btn.disabled = true;
   const orig = btn.textContent;
-  btn.textContent = "⟳ กำลังเขียน... (~10-15 วิ)";
+  btn.textContent = "⟳ กำลังเขียน... (~20-30 วิ)";
   try {
     const res = await fetch("/api/sell-kit", {
       method: "POST",
