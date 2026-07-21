@@ -107,6 +107,150 @@ ${SHARED_RULES}
 }
 (angles ครบ 5 มุม เรียง rank 1-5 — กระชับ ไม่ต้องน้ำเยอะ)`;
 
+// ═══════ WINNING PRODUCT EXPANSION (framework ของ founder — ห้ามแก้หลักคิด) ═══════
+// แตก Winning Product เป็น Content System: Diagnosis → Avatars → 30 มุม → Hooks 50 → แผนเทสต์
+// แบ่งเป็น 3 stage เพื่อความเร็ว: expand (section 1-4) / hooks (section 5) / plan (section 6,8,9,10)
+// section 7 (full scripts) ใช้ stage "script" ต่อมุมที่มีอยู่แล้ว
+
+const WIN_ROLE = `คุณคือ TikTok Shop Affiliate Sales Angle Strategist ระดับ Top 0.1%
+หน้าที่ของคุณคือ "แตกมุมการขายจาก Winning Product" ให้กลายเป็นหลายคลิป หลายมุม หลาย buyer pain โดยไม่ต้องหาสินค้าใหม่
+เป้าหมาย: เปลี่ยนสินค้าที่เริ่มขายได้/คลิปเริ่มมีออเดอร์/เริ่มแมส ให้กลายเป็น Content System ที่ Test, Scale, Re-angle ได้อย่างเป็นระบบ
+
+ข้อห้าม (เด็ดขาด):
+- ห้ามให้คำตอบ generic ห้ามแตกมุมแบบผิวเผิน
+- ห้ามพูดแค่ "ทำรีวิว / ทำ before-after"
+- ห้ามเน้นยอดวิวมากกว่ายอดขาย ห้ามดึง beginner ที่ไม่มี buying intent
+- ห้ามใช้คำเคลมเกินจริง ห้ามเขียนเหมือนแบรนด์พูดเอง
+- ต้องเขียนเหมือน creator ที่ขายของเป็น
+- ผู้ฟังคือคนซื้อสินค้า — ห้ามพูดถึงค่าคอม/ตัวเลขระบบในบทพูดหรือ hook`;
+
+function buildWinBrief(w) {
+  const f = (label, v) => (v && String(v).trim() ? `${label}: ${String(v).trim().slice(0, 400)}` : null);
+  return [
+    f("1. ชื่อสินค้า", w.name),
+    f("2. หมวดสินค้า", w.category),
+    f("3. ราคา", w.price),
+    f("4. ค่าคอม", w.commission),
+    f("5. คลิปที่ขายได้พูดมุมไหน", w.winning_angle),
+    f("6. Hook ที่ใช้", w.winning_hook),
+    f("7. คนซื้อคือใคร", w.buyer),
+    f("8. Pain หลักของคนซื้อ", w.pain),
+    f("9. จุดเด่นสินค้า", w.strengths),
+    f("10. จุดที่คนลังเลก่อนซื้อ", w.hesitation),
+    f("11. คอมเมนต์/คำถามจากลูกค้า", w.comments),
+    f("12. คู่แข่งขายมุมไหนอยู่", w.competitors),
+    f("13. ข้อจำกัดของสินค้า", w.limits),
+    f("14. เป้าหมายของคลิปใหม่", w.goal),
+  ].filter(Boolean).join("\n");
+}
+
+// part: "core" = section 1-3 | "angles:A-E" / "angles:F-J" = section 4 ครึ่งละ 15 มุม
+// แยก 3 call ยิงขนานจาก frontend — call เดียว 30 มุมโดนตัด JSON + ช้า 3.5 นาที (พิสูจน์แล้ว)
+const ANGLE_CATS = {
+  "A-E": `A. Pain (เจ็บปัญหาโดยตรง) / B. Mistake (คุณกำลังใช้/เลือก/ทำผิดอยู่) / C. Comparison (ก่อน-หลัง, ถูก-แพง, ตัวนี้ vs ตัวเก่า) / D. Identity (คนแบบฉันควรใช้สิ่งนี้) / E. Daily Situation (สถานการณ์ประจำวันที่ทำให้จำเป็น)`,
+  "F-J": `F. Objection (แพงไหม ใช้ยากไหม เห็นผลจริงไหม เหมาะกับใคร) / G. Proof (ผลลัพธ์ รีวิว ทดลอง reaction) / H. Urgency (ไม่ซื้อตอนนี้พลาดอะไร — ห้าม urgency ปลอม) / I. Gift/Occasion (ของขวัญ เทศกาล ให้แฟน พ่อแม่ ลูก) / J. Competitor Reframe (ทำให้ต่างจากของที่คนเคยเห็น)`,
+};
+
+function buildExpandPrompt(winBrief, hasImages, part) {
+  const head = `${WIN_ROLE}
+
+ข้อมูลสินค้า:
+${winBrief}
+${hasImages ? "(มีรูปสินค้า/กราฟแนบมา — ใช้สิ่งที่เห็นจริงประกอบ ห้ามเดาสิ่งที่มองไม่เห็น)" : ""}
+ข้อมูลข้อไหนไม่ได้ให้มา ให้วิเคราะห์จากข้อมูลที่มี ห้ามแต่งข้อมูลเพิ่ม`;
+
+  if (part === "core") {
+    return `${head}
+
+ทำ 3 ส่วนนี้:
+
+1. Product Diagnosis — สินค้านี้ขายได้เพราะอะไรจริงๆ อย่าตอบว่า "สินค้าดี" ให้หา hidden buying reason (แก้ pain รายวัน / ชีวิตง่ายขึ้น / ดูดีขึ้น / ลดความอาย / ลดความเสี่ยง / ประหยัดเงิน / ประหยัดเวลา / ใช้แทนของแพง / รู้สึกฉลาดที่ซื้อ / กลัวพลาด / เห็นผลเร็ว)
+
+2. Winning Angle Breakdown — แยกคลิปที่ขายได้: Hook ดึงคนแบบไหน / Pain ที่หยุดคนดู / Desire ที่ถูกกระตุ้น / Belief ที่ถูกเปลี่ยน / Proof ที่ทำให้เชื่อ / CTA ที่ทำให้ซื้อ / เหตุผลที่มุมนี้ชนะ (ถ้าไม่มีข้อมูลคลิปเดิม ให้ null)
+
+3. Core Buyer Avatar — 3-5 กลุ่ม แต่ละกลุ่ม: เขาเป็นใคร / เจ็บเรื่องอะไร / อยากได้ผลลัพธ์อะไร / กลัวอะไร / ต้องได้ยินประโยคไหนถึงจะซื้อ
+
+ตอบเป็น JSON เท่านั้น (ทุก field ประโยคสั้น ห้ามน้ำ):
+{
+  "product_name": "<ชื่อสินค้า>",
+  "diagnosis": {
+    "summary": "<2-3 ประโยค: ขายได้เพราะอะไรจริงๆ>",
+    "hidden_buying_reasons": [ { "reason": "<ชื่อเหตุผล>", "why": "<อธิบายสั้น>" } ]
+  },
+  "winning_breakdown": { "hook_type": "", "pain": "", "desire": "", "belief_shift": "", "proof": "", "cta": "", "why_it_won": "" } หรือ null,
+  "avatars": [ { "name": "<ชื่อกลุ่มสั้น>", "who": "", "pain": "", "want": "", "fear": "", "buying_line": "<ประโยคที่ต้องได้ยินถึงจะซื้อ>" } ]
+}`;
+  }
+
+  const range = part === "angles:F-J" ? "F-J" : "A-E";
+  const startNo = range === "A-E" ? 1 : 16;
+  return `${head}
+
+Sales Angle Expansion — แตกมุมขาย 15 มุม แบ่ง 5 หมวด หมวดละ 3 มุม:
+${ANGLE_CATS[range]}
+
+แต่ละมุมต้องคนละ pain คนละกลุ่มคนจริงๆ ห้ามผิวเผิน ห้ามซ้ำกันเอง
+ทุก field เขียนสั้น 1 ประโยค (main_message/selling_point ไม่เกิน 15 คำ)
+
+ตอบเป็น JSON เท่านั้น:
+{ "angles": [ { "no": ${startNo}, "category": "<หมวด เช่น A. Pain>", "name": "<Angle Name>", "hook": "<Hook>", "main_message": "", "buyer_pain": "", "selling_point": "", "cta": "", "clip_type": "<Vlog|Review|Voiceover|Comparison|Demo|Story|Reaction>" } ] }
+(ครบ 15 มุม no ${startNo}-${startNo + 14} เรียงตามหมวด)`;
+}
+
+function buildHooksPrompt(winBrief, expandSummary) {
+  return `${WIN_ROLE}
+
+ข้อมูลสินค้า:
+${winBrief}
+${expandSummary ? `\nสรุปจากการวิเคราะห์: ${expandSummary}` : ""}
+
+สร้าง Hook 50 อันสำหรับสินค้านี้ แบ่งเป็น:
+- 10 Hook แบบเจ็บ pain
+- 10 Hook แบบเตือนว่ากำลังทำผิด
+- 10 Hook แบบเปรียบเทียบ
+- 10 Hook แบบ curiosity
+- 10 Hook แบบ buyer-now พร้อมซื้อ
+
+Hook ต้องสั้น แรง เข้าใจใน 1-2 วินาทีแรก ห้าม generic ห้ามเริ่มด้วย "วันนี้จะมารีวิว" ห้ามพูดเหมือนโฆษณา ห้ามซ้ำ pattern กันเอง
+
+ตอบเป็น JSON เท่านั้น:
+{ "hooks": { "pain": ["...×10"], "mistake": ["...×10"], "comparison": ["...×10"], "curiosity": ["...×10"], "buyer_now": ["...×10"] } }`;
+}
+
+function buildPlanPrompt(winBrief, anglesList) {
+  return `${WIN_ROLE}
+
+ข้อมูลสินค้า:
+${winBrief}
+
+มุมขายที่แตกไว้แล้ว (30 มุม):
+${anglesList}
+
+ทำ 4 ส่วนนี้:
+
+1. Content Re-angle Map — เอาคลิป winning เดิมแตกเป็น 10 เวอร์ชันใหม่ แต่ละเวอร์ชันเปลี่ยนอย่างน้อย 1 อย่าง (Hook / Pain / Buyer / สถานการณ์ / B-roll / Proof / CTA / Story / Objection / Comparison)
+
+2. Scale Decision — 3 มุมทำก่อน / 3 มุมโอกาสขายดีสุด / 3 มุมเหมาะคนพร้อมซื้อ / 3 มุมดึงคนกว้าง / มุมที่ควรเลี่ยงเพราะดึงคนไม่ซื้อ / ควรทำกี่คลิปใน 7 วัน / ถ้ามุมไหนชนะ scale ยังไงต่อ (อ้างมุมด้วยเลข no + ชื่อ)
+
+3. Test Plan 7 วัน — Day 1-7 ลงมุมไหน วันละกี่คลิป คลิปไหน test / scale / proof / objection handling
+
+4. Metrics — metric ที่ต้องดู (3-second hold, avg watch time, watched full, CTR, add to cart, orders, comment intent, save rate, revenue per clip, order per 1,000 views) + กฎตัดสิน: view เยอะไม่ขายแก้ยังไง / view น้อยขายดี scale ยังไง / คนถามเยอะไม่ซื้อแปลว่าอะไร / เมื่อไหร่หยุดทันที
+
+ตอบเป็น JSON เท่านั้น (กระชับ):
+{
+  "reangle_map": [ { "version": 1, "angle": "", "hook": "", "changed": "<สิ่งที่เปลี่ยน>", "why_test": "", "kpi": "" } ],
+  "scale": {
+    "do_first": ["<no. ชื่อมุม — เหตุผลสั้น>"], "best_sellers": [""], "buyer_ready": [""], "broad_reach": [""],
+    "avoid": ["<มุมที่เลี่ยง + เพราะอะไร>"], "clips_in_7_days": <number>, "scale_how": "<ถ้าชนะ scale ยังไง>"
+  },
+  "test_plan": [ { "day": 1, "clips": [ { "angle": "", "purpose": "<test|scale|proof|objection>" } ] } ],
+  "metrics": {
+    "watch": ["<metric + เกณฑ์>"],
+    "decisions": [ { "situation": "view เยอะแต่ไม่ขาย", "action": "" }, { "situation": "view น้อยแต่ขายดี", "action": "" }, { "situation": "คนถามเยอะแต่ไม่ซื้อ", "action": "" }, { "situation": "หยุดทันทีเมื่อ", "action": "" } ]
+  }
+}`;
+}
+
 function buildScriptPrompt({ productName, analysisBrief, angle, options }) {
   const duration = Math.min(180, Math.max(15, parseInt(options.duration_sec, 10) || 30));
   const style = String(options.style || "แบบไหนก็ได้").slice(0, 100);
@@ -214,7 +358,8 @@ export default async function handler(req, res) {
     }
     const email = identity.email;
 
-    const stage = body.stage === "script" ? "script" : "analyze";
+    const VALID_STAGES = ["analyze", "script", "expand", "hooks", "plan"];
+    const stage = VALID_STAGES.includes(body.stage) ? body.stage : "analyze";
 
     // ─────────────────────────────────────────
     // STAGE 2: เขียนสคริปต์จากมุมที่เลือก + เงื่อนไขถ่ายจริง
@@ -258,6 +403,92 @@ export default async function handler(req, res) {
 
       console.log("[sell-kit] script ok:", { email, angle: angle.name, dur: parsed.script.duration_sec });
       return res.status(200).json({ ok: true, script: parsed.script });
+    }
+
+    // ─────────────────────────────────────────
+    // WINNING EXPANSION: expand (section 1-4) / hooks (section 5) / plan (section 6,8,9,10)
+    // ─────────────────────────────────────────
+    if (stage === "expand" || stage === "hooks" || stage === "plan") {
+      const win = body.win || {};
+      if (!win.name || !String(win.name).trim()) {
+        return res.status(400).json({ error: "bad_request", message: "ใส่ชื่อสินค้าก่อน — ระบบต้องรู้ว่ากำลังแตกมุมอะไร" });
+      }
+      const winBrief = buildWinBrief(win);
+
+      if (stage === "expand") {
+        // แยก 3 part ยิงขนานจาก frontend: core / angles:A-E / angles:F-J
+        // (call เดียว 30 มุม = JSON โดนตัด + 3.5 นาที — พิสูจน์แล้ว 2026-07-21)
+        const part = ["core", "angles:A-E", "angles:F-J"].includes(body.part) ? body.part : "core";
+        const images = part === "core" ? (Array.isArray(body.images) ? body.images : []).slice(0, MAX_IMAGES) : [];
+        const content = [];
+        images.forEach((img) => {
+          if (!img || !img.data) return;
+          content.push({
+            type: "image",
+            source: { type: "base64", media_type: img.media_type || "image/jpeg", data: img.data },
+          });
+        });
+        content.push({ type: "text", text: buildExpandPrompt(winBrief, images.length > 0, part) });
+
+        console.log("[sell-kit] expand:", { email, product: win.name, part, images: images.length });
+        const textOut = await callClaude(content, part === "core" ? 4000 : 7000);
+
+        let parsed;
+        try {
+          parsed = JSON.parse(cleanJsonText(textOut));
+        } catch (e) {
+          console.error(`[sell-kit expand ${part}] parse error:`, textOut.slice(-400));
+          return res.status(502).json({ error: "parse_error", message: "AI ตอบไม่สมบูรณ์ — กดใหม่อีกครั้ง" });
+        }
+
+        if (part === "core") {
+          if (!parsed?.diagnosis || !Array.isArray(parsed.avatars)) {
+            return res.status(502).json({ error: "invalid_expand", message: "ผลลัพธ์ไม่ครบ — กดใหม่อีกครั้ง" });
+          }
+        } else if (!Array.isArray(parsed?.angles) || parsed.angles.length < 10) {
+          return res.status(502).json({ error: "invalid_expand", message: "มุมไม่ครบ — กดใหม่อีกครั้ง" });
+        }
+
+        return res.status(200).json({ ok: true, part, expand: parsed });
+      }
+
+      if (stage === "hooks") {
+        const expandSummary = String(body.expand_summary || "").slice(0, 600);
+        console.log("[sell-kit] hooks:", { email, product: win.name });
+        const textOut = await callClaude([{ type: "text", text: buildHooksPrompt(winBrief, expandSummary) }], 5000);
+
+        let parsed;
+        try {
+          parsed = JSON.parse(cleanJsonText(textOut));
+        } catch (e) {
+          console.error("[sell-kit hooks] parse error:", textOut.slice(-400));
+          return res.status(502).json({ error: "parse_error", message: "AI ตอบไม่สมบูรณ์ — กดใหม่อีกครั้ง" });
+        }
+        if (!parsed?.hooks || !Array.isArray(parsed.hooks.pain)) {
+          return res.status(502).json({ error: "invalid_hooks", message: "Hook ไม่ครบ — กดใหม่อีกครั้ง" });
+        }
+        return res.status(200).json({ ok: true, hooks: parsed.hooks });
+      }
+
+      // stage === "plan"
+      const anglesList = String(body.angles_list || "").slice(0, 4000);
+      if (!anglesList) {
+        return res.status(400).json({ error: "bad_request", message: "ต้องแตก 30 มุมก่อน (กดปุ่มวิเคราะห์) แล้วค่อยขอแผน" });
+      }
+      console.log("[sell-kit] plan:", { email, product: win.name });
+      const textOut = await callClaude([{ type: "text", text: buildPlanPrompt(winBrief, anglesList) }], 8000);
+
+      let parsed;
+      try {
+        parsed = JSON.parse(cleanJsonText(textOut));
+      } catch (e) {
+        console.error("[sell-kit plan] parse error:", textOut.slice(-400));
+        return res.status(502).json({ error: "parse_error", message: "AI ตอบไม่สมบูรณ์ — กดใหม่อีกครั้ง" });
+      }
+      if (!Array.isArray(parsed?.reangle_map) || !parsed?.scale || !Array.isArray(parsed?.test_plan)) {
+        return res.status(502).json({ error: "invalid_plan", message: "แผนไม่ครบ — กดใหม่อีกครั้ง" });
+      }
+      return res.status(200).json({ ok: true, plan: parsed });
     }
 
     // ─────────────────────────────────────────
