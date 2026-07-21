@@ -1062,6 +1062,25 @@ body.lego-method-student .af-upsell { display: none !important; }
 .sellkit-table th { text-align: left; color: var(--gold); font-weight: 700; padding: 6px 8px; border-bottom: 1px solid rgba(245,239,230,0.25); }
 .sellkit-table td { padding: 6px 8px; border-bottom: 1px solid rgba(245,239,230,0.1); color: rgba(245,239,230,0.88); vertical-align: top; line-height: 1.5; }
 .sellkit-table-wrap { overflow-x: auto; }
+.sellkit-acc { border: 1px solid rgba(245,239,230,0.18); margin-bottom: 6px; }
+.sellkit-acc > summary { cursor: pointer; padding: 10px 12px; font-size: 13px; color: var(--cream); list-style: none; line-height: 1.5; }
+.sellkit-acc > summary::-webkit-details-marker { display: none; }
+.sellkit-acc > summary::before { content: "▸ "; color: var(--gold); }
+.sellkit-acc[open] > summary::before { content: "▾ "; }
+.sellkit-acc > summary .acc-hook { display: block; color: rgba(245,239,230,0.6); font-style: italic; font-size: 12px; margin-top: 2px; }
+.sellkit-acc-body { padding: 2px 12px 12px; }
+.sellkit-big { border: 1px solid rgba(245,239,230,0.25); margin: 14px 0; }
+.sellkit-big > summary { cursor: pointer; padding: 12px 14px; font-family: 'Fraunces', serif; font-weight: 700; font-size: 13px; color: var(--gold); list-style: none; letter-spacing: 0.04em; }
+.sellkit-big > summary::-webkit-details-marker { display: none; }
+.sellkit-big > summary::before { content: "▸ "; }
+.sellkit-big[open] > summary::before { content: "▾ "; }
+.sellkit-big-body { padding: 0 14px 14px; }
+.sellkit-more { margin: 2px 0 12px; }
+.sellkit-more > summary { cursor: pointer; font-size: 12px; color: rgba(245,239,230,0.6); list-style: none; padding: 4px 0; }
+.sellkit-more > summary::-webkit-details-marker { display: none; }
+.sellkit-more[open] > summary { color: var(--gold); }
+.sellkit-star { background: rgba(212,175,55,0.12); border: 1px solid var(--gold); padding: 12px 14px; margin: 14px 0; font-size: 13px; line-height: 1.6; color: var(--cream); }
+.sellkit-star b { color: var(--gold); }
 @media (max-width: 720px) { .sellkit { padding: 18px 20px; } .sellkit-options, .sellkit-winform { grid-template-columns: 1fr; } }
 
 /* ── Creator Insight Panel ── */
@@ -1767,38 +1786,38 @@ body.result-locked .result-block::after {
         <button class="sellkit-tab" id="sellkitTabWin" onclick="sellkitSetMode('win')">🏆 สินค้าเริ่มขายได้แล้ว — แตก 30 มุม</button>
       </div>
 
-      <!-- โหมด WINNING: framework แตกมุมจาก Winning Product ของ LEGO METHOD -->
+      <!-- โหมด WINNING: ปุ่มเดียวจบ — 30 มุม + Hook 50 + แผน 7 วัน (framework ของ founder) -->
       <div id="sellkitWinPane" style="display:none">
-        <div class="sellkit-sub">สินค้าที่เริ่มมีออเดอร์/คลิปเริ่มแมส — กรอกเท่าที่รู้ (ช่องไหนไม่รู้ เว้นได้) ระบบจะ Diagnosis → Buyer Avatar → แตก 30 มุม → Hook 50 → แผนเทสต์ 7 วัน</div>
+        <div class="sellkit-sub">สินค้าที่เริ่มมีออเดอร์แล้ว — กรอก 2-3 ช่อง กดปุ่มเดียว ระบบทำให้ครบ: แตก 30 มุม → Hook 50 → แผน 7 วัน</div>
         <div class="sellkit-winform">
-          <div><label class="sellkit-opt-label">ชื่อสินค้า *</label><input id="skw_name" placeholder="เช่น หมอนรองคอ ergonomic"></div>
-          <div><label class="sellkit-opt-label">หมวดสินค้า</label><input id="skw_category" placeholder="เช่น ของใช้ในบ้าน"></div>
-          <div><label class="sellkit-opt-label">ราคา</label><input id="skw_price" placeholder="เช่น 259 บาท"></div>
-          <div><label class="sellkit-opt-label">ค่าคอม</label><input id="skw_commission" placeholder="เช่น 15%"></div>
-          <div class="full"><label class="sellkit-opt-label">คลิปที่ขายได้พูดมุมไหน</label><textarea id="skw_winning_angle" placeholder="เช่น มุมปวดคอจากนั่งทำงาน โชว์ใช้จริงตอนเช้า"></textarea></div>
-          <div class="full"><label class="sellkit-opt-label">Hook ที่ใช้ (ในคลิปที่ขายได้)</label><input id="skw_winning_hook" placeholder="ประโยคเปิดของคลิปที่ขายได้"></div>
-          <div><label class="sellkit-opt-label">คนซื้อคือใคร</label><input id="skw_buyer" placeholder="เช่น พนักงานออฟฟิศ 25-40"></div>
-          <div><label class="sellkit-opt-label">Pain หลักของคนซื้อ</label><input id="skw_pain" placeholder="เช่น ปวดคอเรื้อรัง"></div>
-          <div><label class="sellkit-opt-label">จุดเด่นสินค้า</label><input id="skw_strengths" placeholder="เช่น ปรับระดับได้ ซักได้"></div>
-          <div><label class="sellkit-opt-label">จุดที่คนลังเลก่อนซื้อ</label><input id="skw_hesitation" placeholder="เช่น กลัวไม่เหมือนรูป"></div>
-          <div class="full"><label class="sellkit-opt-label">คอมเมนต์ / คำถามจากลูกค้า</label><textarea id="skw_comments" placeholder="วางคอมเมนต์จริงจากคลิป — ยิ่งจริงยิ่งแม่น"></textarea></div>
-          <div><label class="sellkit-opt-label">คู่แข่งขายมุมไหนอยู่</label><input id="skw_competitors" placeholder="เช่น ทุกคนเล่นมุมราคาถูก"></div>
-          <div><label class="sellkit-opt-label">ข้อจำกัดของสินค้า</label><input id="skw_limits" placeholder="เช่น สีเดียว ส่งช้า"></div>
-          <div class="full"><label class="sellkit-opt-label">เป้าหมายของคลิปใหม่</label>
-            <select id="skw_goal">
-              <option value="ขายเร็ว">ขายเร็ว</option>
-              <option value="เพิ่มความเชื่อ">เพิ่มความเชื่อ</option>
-              <option value="เทียบคู่แข่ง">เทียบคู่แข่ง</option>
-              <option value="ปิด objection">ปิด objection</option>
-              <option value="ทำซ้ำคลิปแมส">ทำซ้ำคลิปแมส</option>
-            </select>
+          <div class="full"><label class="sellkit-opt-label">ชื่อสินค้า *</label><input id="skw_name" placeholder="เช่น หมอนรองคอ ergonomic"></div>
+          <div class="full"><label class="sellkit-opt-label">คลิปที่ขายได้ พูดมุมไหน / hook อะไร</label><textarea id="skw_winning_angle" placeholder="เช่น มุมปวดคอตื่นเช้า hook 'ตื่นมาคอแข็งทุกวัน' ได้ 40 ออเดอร์ใน 3 วัน"></textarea></div>
+          <div class="full"><label class="sellkit-opt-label">คอมเมนต์ / คำถามจากลูกค้า (วางได้เลย — ช่องนี้ทำให้มุมแม่นสุด)</label><textarea id="skw_comments" placeholder="เช่น คนนอนตะแคงใช้ได้ไหม / สูงไปหรือเปล่า"></textarea></div>
+        </div>
+        <details class="sellkit-more"><summary>+ เพิ่มรายละเอียด (ไม่บังคับ — ยิ่งกรอกยิ่งแม่น)</summary>
+          <div class="sellkit-winform" style="margin-top:8px">
+            <div><label class="sellkit-opt-label">หมวดสินค้า</label><input id="skw_category"></div>
+            <div><label class="sellkit-opt-label">ราคา</label><input id="skw_price"></div>
+            <div><label class="sellkit-opt-label">ค่าคอม</label><input id="skw_commission"></div>
+            <div><label class="sellkit-opt-label">Hook เดิมที่ใช้</label><input id="skw_winning_hook"></div>
+            <div><label class="sellkit-opt-label">คนซื้อคือใคร</label><input id="skw_buyer"></div>
+            <div><label class="sellkit-opt-label">Pain หลักของคนซื้อ</label><input id="skw_pain"></div>
+            <div><label class="sellkit-opt-label">จุดเด่นสินค้า</label><input id="skw_strengths"></div>
+            <div><label class="sellkit-opt-label">จุดที่คนลังเล</label><input id="skw_hesitation"></div>
+            <div><label class="sellkit-opt-label">คู่แข่งขายมุมไหน</label><input id="skw_competitors"></div>
+            <div><label class="sellkit-opt-label">ข้อจำกัดสินค้า</label><input id="skw_limits"></div>
+            <div class="full"><label class="sellkit-opt-label">เป้าหมายของคลิปใหม่</label>
+              <select id="skw_goal">
+                <option value="ขายเร็ว">ขายเร็ว</option>
+                <option value="เพิ่มความเชื่อ">เพิ่มความเชื่อ</option>
+                <option value="เทียบคู่แข่ง">เทียบคู่แข่ง</option>
+                <option value="ปิด objection">ปิด objection</option>
+                <option value="ทำซ้ำคลิปแมส">ทำซ้ำคลิปแมส</option>
+              </select>
+            </div>
           </div>
-        </div>
-        <div class="sellkit-win-actions">
-          <button class="sellkit-btn" id="sellkitExpandBtn" onclick="sellkitExpand()">🧠 วิเคราะห์ + แตก 30 มุม</button>
-          <button class="sellkit-btn secondary" id="sellkitHooksBtn" onclick="sellkitHooks()">🪝 Hook Bank 50</button>
-          <button class="sellkit-btn secondary" id="sellkitPlanBtn" onclick="sellkitPlan()">📅 แผน 7 วัน + Scale</button>
-        </div>
+        </details>
+        <button class="sellkit-btn" id="sellkitExpandBtn" onclick="sellkitExpand()">🪄 แตกมุม + Hook + แผน — ปุ่มเดียวจบ</button>
       </div>
 
       <div id="sellkitNewPane">
@@ -3703,7 +3722,7 @@ async function generateSellKit() {
   const btn = document.getElementById("sellkitBtn");
   sellkitBusy = true;
   btn.disabled = true;
-  btn.textContent = "⟳ กำลังอ่านภาพ + แตกมุมขาย... (~30-60 วิ)";
+  btn.textContent = "⟳ กำลังอ่านภาพ + แตกมุมขาย... (~15-30 วิ)";
   status.innerHTML = "AI กำลังอ่านรูปทั้งหมด วิเคราะห์ตลาด และแตกมุมขาย 5 มุม";
 
   try {
@@ -3829,7 +3848,7 @@ async function sellkitMakeScript(i) {
 
   btn.disabled = true;
   const orig = btn.textContent;
-  btn.textContent = "⟳ กำลังเขียน... (~20-30 วิ)";
+  btn.textContent = "⟳ กำลังเขียน... (~10-15 วิ)";
 
   try {
     const res = await fetch("/api/sell-kit", {
@@ -3911,7 +3930,7 @@ function sellkitCopy(btn, angleIdx, verIdx) {
   }
 }
 
-// ═════ WINNING MODE — แตก 30 มุมจากสินค้าที่เริ่มขายได้ (framework ของ founder) ═════
+// ═════ WINNING MODE — ปุ่มเดียวจบ: 30 มุม + Hook 50 + แผน 7 วัน (framework ของ founder) ═════
 let sellkitWinData = { expand: null, hooks: null, plan: null };
 
 function sellkitSetMode(m) {
@@ -3921,7 +3940,6 @@ function sellkitSetMode(m) {
   document.getElementById("sellkitWinPane").style.display = m === "win" ? "" : "none";
   document.getElementById("sellkitOut").innerHTML = "";
   document.getElementById("sellkitStatus").innerHTML = "";
-  // prefill ชื่อสินค้าจากฟอร์ม scanner ถ้ามี
   if (m === "win") {
     const nameEl = document.getElementById("skw_name");
     const scanName = (document.getElementById("productName")?.value || "").trim();
@@ -3939,148 +3957,114 @@ function sellkitWinInputs() {
   };
 }
 
-async function sellkitWinCall(stageName, extra, btnId, busyText) {
-  const status = document.getElementById("sellkitStatus");
-  if (!currentSession?.token) {
-    status.innerHTML = '<span class="err">⚠ ต้อง login ก่อนใช้ Sell Kit</span>';
-    return null;
-  }
-  const win = sellkitWinInputs();
-  if (!win.name) {
-    status.innerHTML = '<span class="err">⚠ ใส่ชื่อสินค้าก่อน</span>';
-    return null;
-  }
-  const btn = document.getElementById(btnId);
-  const orig = btn.textContent;
-  btn.disabled = true;
-  btn.textContent = busyText;
-  try {
-    const res = await fetch("/api/sell-kit", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-session-token": currentSession.token },
-      body: JSON.stringify(Object.assign({ stage: stageName, win }, extra || {})),
-    });
-    const result = await res.json().catch(() => null);
-    if (res.status === 401) { status.innerHTML = '<span class="err">⚠ Session หมดอายุ — login ใหม่</span>'; return null; }
-    if (!res.ok || !result?.ok) {
-      status.innerHTML = '<span class="err">⚠ ' + skEsc(result?.message || "ไม่สำเร็จ — ลองใหม่อีกครั้ง") + '</span>';
-      return null;
-    }
-    return result;
-  } catch (e) {
-    status.innerHTML = '<span class="err">⚠ เกิดข้อผิดพลาด: ' + skEsc(e.message || e) + '</span>';
-    return null;
-  } finally {
-    btn.disabled = false;
-    btn.textContent = orig;
-  }
+function sellkitWinFetch(stageName, extra) {
+  return fetch("/api/sell-kit", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-session-token": currentSession.token },
+    body: JSON.stringify(Object.assign({ stage: stageName, win: sellkitWinInputs() }, extra || {})),
+  }).then(r => r.json().catch(() => null));
 }
 
-// ── ปุ่ม 1: Diagnosis + Avatars + 30 มุม (ยิง 3 calls ขนาน — เร็วกว่า call เดียว 3 เท่า) ──
+// ── ปุ่มเดียวจบ: แตก 30 มุม (3 AI ขนาน) → ต่อ Hook 50 + แผน 7 วัน อัตโนมัติ ──
 async function sellkitExpand() {
   const status = document.getElementById("sellkitStatus");
-  if (!currentSession?.token) {
-    status.innerHTML = '<span class="err">⚠ ต้อง login ก่อนใช้ Sell Kit</span>';
-    return;
-  }
-  const win = sellkitWinInputs();
-  if (!win.name) {
-    status.innerHTML = '<span class="err">⚠ ใส่ชื่อสินค้าก่อน</span>';
-    return;
-  }
+  if (!currentSession?.token) { status.innerHTML = '<span class="err">⚠ ต้อง login ก่อนใช้ Sell Kit</span>'; return; }
+  if (!sellkitWinInputs().name) { status.innerHTML = '<span class="err">⚠ ใส่ชื่อสินค้าก่อน</span>'; return; }
 
   const btn = document.getElementById("sellkitExpandBtn");
   if (btn.disabled) return;
   btn.disabled = true;
   const orig = btn.textContent;
-  btn.textContent = "⟳ กำลังแตก 30 มุม... (~1-1.5 นาที)";
-  status.innerHTML = "AI 3 ตัวทำงานพร้อมกัน: Diagnosis+Avatar / มุม A-E / มุม F-J";
-
-  const call = (part, extra) => fetch("/api/sell-kit", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-session-token": currentSession.token },
-    body: JSON.stringify(Object.assign({ stage: "expand", part, win }, extra || {})),
-  }).then(r => r.json().catch(() => null));
+  btn.textContent = "⟳ กำลังแตก 30 มุม...";
+  status.innerHTML = "ขั้น 1/2 — AI 3 ตัวแตกมุมพร้อมกัน (~30-40 วิ)";
 
   try {
     const [core, ae, fj] = await Promise.all([
-      call("core", { images: sellkitPhotos }),
-      call("angles:A-E"),
-      call("angles:F-J"),
+      sellkitWinFetch("expand", { part: "core", images: sellkitPhotos }),
+      sellkitWinFetch("expand", { part: "angles:A-E" }),
+      sellkitWinFetch("expand", { part: "angles:F-J" }),
     ]);
 
     if (!core?.ok) { status.innerHTML = '<span class="err">⚠ ' + skEsc(core?.message || "วิเคราะห์ไม่สำเร็จ — ลองใหม่") + '</span>'; return; }
-
-    const angles = []
-      .concat(ae?.ok ? ae.expand.angles : [])
-      .concat(fj?.ok ? fj.expand.angles : []);
-
+    const angles = [].concat(ae?.ok ? ae.expand.angles : []).concat(fj?.ok ? fj.expand.angles : []);
     if (!angles.length) { status.innerHTML = '<span class="err">⚠ แตกมุมไม่สำเร็จ — กดใหม่อีกครั้ง</span>'; return; }
 
     sellkitWinData.expand = Object.assign({}, core.expand, { angles });
-    sellkitWinData.plan = null;
-
-    let warn = "";
-    if (!ae?.ok || !fj?.ok) warn = " (ได้มาบางส่วน — กดปุ่มเดิมซ้ำเพื่อเอาที่เหลือ)";
-    status.innerHTML = "✓ ได้ " + angles.length + " มุมแล้ว" + warn + " — กด ✍️ ที่มุมไหนก็ได้เพื่อเขียนสคริปต์เต็ม หรือกด Hook Bank / แผน 7 วันต่อ";
     sellkitRenderExpand(sellkitWinData.expand);
+
+    // ขั้น 2 อัตโนมัติ: Hook 50 + แผน 7 วัน พร้อมกัน
+    btn.textContent = "⟳ กำลังทำ Hook 50 + แผน 7 วัน...";
+    status.innerHTML = "✓ ได้ " + angles.length + " มุมแล้ว (กดเปิดดูทีละมุมได้เลย) — ขั้น 2/2 กำลังทำ Hook 50 + แผน 7 วันต่อให้อัตโนมัติ";
+
+    const anglesList = angles.map(a => a.no + ". [" + a.category + "] " + a.name + " — " + a.main_message).join("\n");
+    const [hk, pl] = await Promise.all([
+      sellkitWinFetch("hooks", { expand_summary: sellkitWinData.expand.diagnosis?.summary || "" }),
+      sellkitWinFetch("plan", { angles_list: anglesList }),
+    ]);
+
+    const out = document.getElementById("sellkitOut");
+    if (pl?.ok) { sellkitWinData.plan = pl.plan; out.insertAdjacentHTML("beforeend", sellkitRenderPlan(pl.plan)); }
+    if (hk?.ok) { sellkitWinData.hooks = hk.hooks; out.insertAdjacentHTML("beforeend", sellkitRenderHooks(hk.hooks)); }
+
+    let miss = [];
+    if (!hk?.ok) miss.push("Hook Bank");
+    if (!pl?.ok) miss.push("แผน 7 วัน");
+    status.innerHTML = miss.length
+      ? "✓ ได้ " + angles.length + " มุมแล้ว แต่ " + miss.join("+") + " ไม่สำเร็จ — กดปุ่มเดิมซ้ำได้"
+      : "✓ ครบแล้ว: " + angles.length + " มุม + Hook 50 + แผน 7 วัน — เริ่มจากกล่อง ⭐ ด้านล่างมุมได้เลย";
   } catch (e) {
-    status.innerHTML = '<span class="err">⚠ เกิดข้อผิดพลาด: ' + skEsc(e.message || e) + '</span>';
+    status.innerHTML = '<span class="err">⚠ เกิดข้อผิดพลาด: ' + skEsc(e.message || e) + ' — ลองใหม่อีกครั้ง</span>';
   } finally {
     btn.disabled = false;
     btn.textContent = orig;
   }
 }
 
+// render แบบพับ — โชว์แค่หัวข้อ กดเปิดทีละอัน (แก้ปัญหา "ล้นเกินไป")
 function sellkitRenderExpand(ex) {
   const out = document.getElementById("sellkitOut");
   let h = "";
 
-  // 1) Diagnosis
-  h += '<div class="sellkit-section-label">① Product Diagnosis — ขายได้เพราะอะไรจริงๆ</div>';
-  h += '<div class="sellkit-analysis"><div class="headline">' + skEsc(ex.diagnosis.summary) + '</div><ul>' +
-    (ex.diagnosis.hidden_buying_reasons || []).map(r => '<li>💡 <b>' + skEsc(r.reason) + '</b> — ' + skEsc(r.why) + '</li>').join("") + '</ul></div>';
+  // สรุปสั้น (มองเห็นเลย)
+  h += '<div class="sellkit-analysis" style="margin-top:16px"><div class="headline">' + skEsc(ex.diagnosis.summary) + '</div></div>';
 
-  // 2) Winning breakdown
+  // เจาะลึก — พับเก็บ
+  h += '<details class="sellkit-big"><summary>🧠 เจาะลึก: ทำไมขายได้ + Buyer Avatar ' + (ex.avatars || []).length + ' กลุ่ม</summary><div class="sellkit-big-body">';
+  h += '<div class="sellkit-analysis"><ul>' + (ex.diagnosis.hidden_buying_reasons || []).map(r => '<li>💡 <b>' + skEsc(r.reason) + '</b> — ' + skEsc(r.why) + '</li>').join("") + '</ul></div>';
   if (ex.winning_breakdown && ex.winning_breakdown.why_it_won) {
-    const w = ex.winning_breakdown;
-    h += '<div class="sellkit-section-label">② ทำไมคลิปเดิมถึงขายได้</div>';
-    h += '<div class="sellkit-analysis"><ul>' +
-      [["Hook ดึงคน", w.hook_type], ["Pain ที่หยุดคนดู", w.pain], ["Desire", w.desire], ["Belief ที่เปลี่ยน", w.belief_shift], ["Proof", w.proof], ["CTA", w.cta]]
-        .filter(x => x[1]).map(x => '<li><b>' + x[0] + ':</b> ' + skEsc(x[1]) + '</li>').join("") +
-      '</ul><div style="margin-top:6px">🏆 <b>เหตุผลที่ชนะ:</b> ' + skEsc(w.why_it_won) + '</div></div>';
+    h += '<div class="sellkit-analysis" style="margin-top:10px">🏆 <b>ทำไมคลิปเดิมชนะ:</b> ' + skEsc(ex.winning_breakdown.why_it_won) + '</div>';
   }
-
-  // 3) Avatars
-  h += '<div class="sellkit-section-label">③ Buyer Avatar ' + (ex.avatars || []).length + ' กลุ่ม</div>';
   (ex.avatars || []).forEach(av => {
-    h += '<div class="sellkit-angle"><div class="sellkit-angle-head"><span class="sellkit-angle-name">' + skEsc(av.name) + '</span></div>' +
-      '<div class="sellkit-angle-body"><b>ใคร:</b> ' + skEsc(av.who) + ' · <b>เจ็บ:</b> ' + skEsc(av.pain) + '<br><b>อยากได้:</b> ' + skEsc(av.want) + ' · <b>กลัว:</b> ' + skEsc(av.fear) + '</div>' +
-      '<div class="sellkit-angle-hook">ประโยคที่ต้องได้ยินถึงจะซื้อ: "' + skEsc(av.buying_line) + '"</div></div>';
+    h += '<div class="sellkit-angle" style="margin-top:10px"><div class="sellkit-angle-head"><span class="sellkit-angle-name">' + skEsc(av.name) + '</span></div>' +
+      '<div class="sellkit-angle-body"><b>ใคร:</b> ' + skEsc(av.who) + ' · <b>เจ็บ:</b> ' + skEsc(av.pain) + ' · <b>กลัว:</b> ' + skEsc(av.fear) + '</div>' +
+      '<div class="sellkit-angle-hook">"' + skEsc(av.buying_line) + '"</div></div>';
   });
+  h += '</div></details>';
 
-  // เงื่อนไขคลิป (ใช้ตอนกดเขียนสคริปต์) — ฟอร์มเดียวกับโหมดปกติ
-  h += '<div class="sellkit-section-label">④ เงื่อนไขคลิปของคุณ (ใช้ตอนกด ✍️)</div>';
-  h += '<div class="sellkit-options">' +
+  // เงื่อนไขคลิป — พับเก็บ (มีค่า default อยู่แล้ว)
+  h += '<details class="sellkit-big"><summary>🎥 เงื่อนไขคลิป: ความยาว / สไตล์ / ฉากที่ถ่ายได้ (ใช้ตอนกด ✍️)</summary><div class="sellkit-big-body">';
+  h += '<div class="sellkit-options" style="margin-top:10px">' +
     '<div><label class="sellkit-opt-label">ความยาวคลิป</label><select id="sellkitDuration"><option value="15">~15 วินาที</option><option value="30" selected>~30 วินาที</option><option value="45">~45 วินาที</option><option value="60">~60 วินาที</option><option value="90">~90 วินาที</option></select></div>' +
     '<div><label class="sellkit-opt-label">สไตล์การถ่าย</label><select id="sellkitStyle"><option value="พากย์เสียงทับ b-roll สินค้า" selected>พากย์เสียงทับ b-roll สินค้า</option><option value="พูดหน้ากล้อง">พูดหน้ากล้อง</option><option value="รีวิว/สาธิตการใช้จริง">รีวิว/สาธิตการใช้จริง</option><option value="แบบไหนก็ได้">แบบไหนก็ได้</option></select></div>' +
     '<div class="full"><label class="sellkit-opt-label">ฉาก / สถานที่ / อุปกรณ์ที่ถ่ายได้จริง</label><textarea id="sellkitScenes" placeholder="เช่น ห้องนอน, มีสินค้าจริง 1 ชิ้น, ถ่ายคนเดียวด้วยมือถือ"></textarea></div></div>';
+  h += '</div></details>';
 
-  // 4) 30 angles grouped by category
+  // 30 มุม — accordion ทีละมุม
   const groups = {};
   (ex.angles || []).forEach(a => { (groups[a.category] = groups[a.category] || []).push(a); });
-  h += '<div class="sellkit-section-label">⑤ มุมขาย ' + (ex.angles || []).length + ' มุม (10 หมวด) — กด ✍️ เพื่อเขียนสคริปต์เต็ม</div>';
+  h += '<div class="sellkit-section-label">มุมขาย ' + (ex.angles || []).length + ' มุม — กดเปิดดู แล้วกด ✍️ เพื่อได้สคริปต์</div>';
   let idx = 0;
   Object.keys(groups).forEach(cat => {
     h += '<div class="sellkit-cat-label">' + skEsc(cat) + '</div>';
     groups[cat].forEach(a => {
       const i = idx++;
-      h += '<div class="sellkit-angle"><div class="sellkit-angle-head"><span class="sellkit-angle-rank">#' + skEsc(a.no) + '</span><span class="sellkit-angle-name">' + skEsc(a.name) + '</span>' +
-        '<span style="margin-left:auto;font-size:10.5px;color:rgba(245,239,230,0.5)">' + skEsc(a.clip_type || "") + '</span></div>' +
-        '<div class="sellkit-angle-body"><b>Message:</b> ' + skEsc(a.main_message) + '<br><b>Pain:</b> ' + skEsc(a.buyer_pain) + ' · <b>จุดขาย:</b> ' + skEsc(a.selling_point) + ' · <b>CTA:</b> ' + skEsc(a.cta) + '</div>' +
-        '<div class="sellkit-angle-hook">"' + skEsc(a.hook) + '"</div>' +
+      h += '<details class="sellkit-acc"><summary><b>#' + skEsc(a.no) + '</b> ' + skEsc(a.name) +
+        '<span class="acc-hook">"' + skEsc(a.hook) + '"</span></summary>' +
+        '<div class="sellkit-acc-body">' +
+        '<div class="sellkit-angle-body"><b>Message:</b> ' + skEsc(a.main_message) + '<br><b>Pain:</b> ' + skEsc(a.buyer_pain) + ' · <b>จุดขาย:</b> ' + skEsc(a.selling_point) + '<br><b>CTA:</b> ' + skEsc(a.cta) + ' · <b>คลิปแบบ:</b> ' + skEsc(a.clip_type || "-") + '</div>' +
         '<div class="sellkit-angle-actions"><button class="sellkit-script-btn" id="sellkitWinScriptBtn' + i + '" onclick="sellkitWinScript(' + i + ', ' + skEsc(a.no) + ')">✍️ เขียนสคริปต์จากมุมนี้</button></div>' +
-        '<div class="sellkit-angle-script" id="sellkitWinScriptSlot' + i + '"></div></div>';
+        '<div class="sellkit-angle-script" id="sellkitWinScriptSlot' + i + '"></div>' +
+        '</div></details>';
     });
   });
 
@@ -4088,7 +4072,7 @@ function sellkitRenderExpand(ex) {
   out.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-// ✍️ สคริปต์เต็มจากมุมใน 30 มุม — reuse stage "script" + เงื่อนไขฉาก
+// ✍️ สคริปต์เต็มจากมุม — reuse stage "script"
 async function sellkitWinScript(slotIdx, angleNo) {
   const ex = sellkitWinData.expand;
   if (!ex) return;
@@ -4107,7 +4091,7 @@ async function sellkitWinScript(slotIdx, angleNo) {
 
   btn.disabled = true;
   const orig = btn.textContent;
-  btn.textContent = "⟳ กำลังเขียน... (~20-30 วิ)";
+  btn.textContent = "⟳ กำลังเขียน... (~10-15 วิ)";
   try {
     const res = await fetch("/api/sell-kit", {
       method: "POST",
@@ -4138,73 +4122,54 @@ async function sellkitWinScript(slotIdx, angleNo) {
   }
 }
 
-// ── ปุ่ม 2: Hook Bank 50 ──
-async function sellkitHooks() {
-  const status = document.getElementById("sellkitStatus");
-  status.innerHTML = "AI กำลังสร้าง Hook 50 อัน (5 ตระกูล) ~30-45 วิ";
-  const result = await sellkitWinCall("hooks",
-    { expand_summary: sellkitWinData.expand?.diagnosis?.summary || "" },
-    "sellkitHooksBtn", "⟳ กำลังสร้าง 50 hooks...");
-  if (!result) return;
-  sellkitWinData.hooks = result.hooks;
-  status.innerHTML = "✓ Hook Bank พร้อม — กด hook ไหนก็ได้เพื่อ copy";
-
-  const names = { pain: "🔥 เจ็บ Pain", mistake: "⚠️ กำลังทำผิด", comparison: "⚖️ เปรียบเทียบ", curiosity: "👀 Curiosity", buyer_now: "🛒 Buyer พร้อมซื้อ" };
-  let h = '<div class="sellkit-section-label">🪝 Hook Bank 50 — กดเพื่อ copy</div>';
-  Object.keys(names).forEach(k => {
-    const list = result.hooks[k] || [];
-    h += '<div class="sellkit-hook-group"><div class="sellkit-cat-label">' + names[k] + ' (' + list.length + ')</div>' +
-      list.map(x => '<div class="sellkit-hook-item" onclick="sellkitCopyText(this)">' + skEsc(x) + '</div>').join("") + '</div>';
-  });
-  const out = document.getElementById("sellkitOut");
-  out.insertAdjacentHTML("afterbegin", h);
-  out.scrollIntoView({ behavior: "smooth", block: "start" });
-}
-
 function sellkitCopyText(el) {
   const t = el.textContent;
   const done = () => { const o = el.style.borderLeftColor; el.style.borderLeftColor = "#8AD17F"; setTimeout(() => el.style.borderLeftColor = o, 900); if (typeof showToast === "function") showToast("copy แล้ว"); };
   if (navigator.clipboard?.writeText) navigator.clipboard.writeText(t).then(done).catch(() => {});
 }
 
-// ── ปุ่ม 3: Re-angle Map + Scale + Test Plan + Metrics ──
-async function sellkitPlan() {
-  const status = document.getElementById("sellkitStatus");
-  const ex = sellkitWinData.expand;
-  if (!ex) {
-    status.innerHTML = '<span class="err">⚠ กด "🧠 วิเคราะห์ + แตก 30 มุม" ก่อน แล้วค่อยขอแผน</span>';
-    return;
-  }
-  status.innerHTML = "AI กำลังทำ Re-angle Map + Scale Decision + แผนเทสต์ 7 วัน + Metrics ~45-60 วิ";
-  const anglesList = (ex.angles || []).map(a => a.no + ". [" + a.category + "] " + a.name + " — " + a.main_message).join("\n");
-  const result = await sellkitWinCall("plan", { angles_list: anglesList }, "sellkitPlanBtn", "⟳ กำลังวางแผน...");
-  if (!result) return;
-  sellkitWinData.plan = result.plan;
-  status.innerHTML = "✓ แผนพร้อม — Re-angle 10 เวอร์ชัน + Scale + 7 วัน + Metrics";
-
-  const p = result.plan;
-  let h = '<div class="sellkit-section-label">📅 Content Re-angle Map — 10 เวอร์ชันจากคลิปเดิม</div>';
-  h += '<div class="sellkit-table-wrap"><table class="sellkit-table"><tr><th>#</th><th>มุมใหม่</th><th>Hook</th><th>เปลี่ยนอะไร</th><th>ทำไมควรเทสต์</th><th>KPI</th></tr>' +
-    (p.reangle_map || []).map(r => '<tr><td>' + skEsc(r.version) + '</td><td>' + skEsc(r.angle) + '</td><td>' + skEsc(r.hook) + '</td><td>' + skEsc(r.changed) + '</td><td>' + skEsc(r.why_test) + '</td><td>' + skEsc(r.kpi) + '</td></tr>').join("") + '</table></div>';
-
+// แผน 7 วัน — โชว์ ⭐ ทำก่อน 3 มุม เด่นๆ ที่เหลือพับเก็บ
+function sellkitRenderPlan(p) {
   const s = p.scale || {};
-  h += '<div class="sellkit-section-label">🎯 Scale Decision</div><div class="sellkit-analysis"><ul>' +
-    [["ทำก่อน 3 มุม", s.do_first], ["โอกาสขายดีสุด", s.best_sellers], ["เหมาะคนพร้อมซื้อ", s.buyer_ready], ["ดึงคนกว้าง", s.broad_reach], ["ควรเลี่ยง", s.avoid]]
+  let h = "";
+  if (Array.isArray(s.do_first) && s.do_first.length) {
+    h += '<div class="sellkit-star">⭐ <b>ทำก่อน 3 มุมนี้:</b><br>' + s.do_first.map(skEsc).join("<br>") + '</div>';
+  }
+  h += '<details class="sellkit-big"><summary>📅 แผนเต็ม: Re-angle ×10 + Scale + 7 วัน + Metrics</summary><div class="sellkit-big-body">';
+
+  h += '<div class="sellkit-cat-label">Re-angle Map — คลิปเดิม 10 เวอร์ชัน</div>';
+  h += '<div class="sellkit-table-wrap"><table class="sellkit-table"><tr><th>#</th><th>มุมใหม่</th><th>Hook</th><th>เปลี่ยนอะไร</th><th>KPI</th></tr>' +
+    (p.reangle_map || []).map(r => '<tr><td>' + skEsc(r.version) + '</td><td>' + skEsc(r.angle) + '</td><td>' + skEsc(r.hook) + '</td><td>' + skEsc(r.changed) + '</td><td>' + skEsc(r.kpi) + '</td></tr>').join("") + '</table></div>';
+
+  h += '<div class="sellkit-cat-label">Scale Decision</div><div class="sellkit-analysis"><ul>' +
+    [["โอกาสขายดีสุด", s.best_sellers], ["เหมาะคนพร้อมซื้อ", s.buyer_ready], ["ดึงคนกว้าง", s.broad_reach], ["ควรเลี่ยง", s.avoid]]
       .filter(x => Array.isArray(x[1]) && x[1].length)
       .map(x => '<li><b>' + x[0] + ':</b><br>' + x[1].map(skEsc).join("<br>") + '</li>').join("") +
     '</ul><div style="margin-top:8px"><b>คลิปใน 7 วัน:</b> ' + skEsc(s.clips_in_7_days) + ' คลิป · <b>ถ้าชนะ:</b> ' + skEsc(s.scale_how) + '</div></div>';
 
-  h += '<div class="sellkit-section-label">🗓 Test Plan 7 วัน</div>';
+  h += '<div class="sellkit-cat-label">Test Plan 7 วัน</div>';
   h += '<div class="sellkit-table-wrap"><table class="sellkit-table"><tr><th>Day</th><th>คลิป (มุม × หน้าที่)</th></tr>' +
     (p.test_plan || []).map(d => '<tr><td>Day ' + skEsc(d.day) + '</td><td>' + (d.clips || []).map(c => skEsc(c.angle) + ' <em style="color:var(--gold)">(' + skEsc(c.purpose) + ')</em>').join("<br>") + '</td></tr>').join("") + '</table></div>';
 
   const m = p.metrics || {};
-  h += '<div class="sellkit-section-label">📊 Metrics + กฎตัดสิน</div><div class="sellkit-analysis"><ul>' +
+  h += '<div class="sellkit-cat-label">Metrics + กฎตัดสิน</div><div class="sellkit-analysis"><ul>' +
     (m.watch || []).map(x => '<li>📈 ' + skEsc(x) + '</li>').join("") + '</ul><ul>' +
     (m.decisions || []).map(d => '<li><b>' + skEsc(d.situation) + ':</b> ' + skEsc(d.action) + '</li>').join("") + '</ul></div>';
 
-  const out = document.getElementById("sellkitOut");
-  out.insertAdjacentHTML("beforeend", h);
+  h += '</div></details>';
+  return h;
+}
+
+// Hook Bank 50 — พับเก็บทั้งกล่อง กด hook เพื่อ copy
+function sellkitRenderHooks(hooks) {
+  const names = { pain: "🔥 เจ็บ Pain", mistake: "⚠️ กำลังทำผิด", comparison: "⚖️ เปรียบเทียบ", curiosity: "👀 Curiosity", buyer_now: "🛒 พร้อมซื้อ" };
+  let inner = "";
+  Object.keys(names).forEach(k => {
+    const list = hooks[k] || [];
+    inner += '<div class="sellkit-cat-label">' + names[k] + ' (' + list.length + ')</div>' +
+      list.map(x => '<div class="sellkit-hook-item" onclick="sellkitCopyText(this)">' + skEsc(x) + '</div>').join("");
+  });
+  return '<details class="sellkit-big"><summary>🪝 Hook Bank 50 — กด hook เพื่อ copy</summary><div class="sellkit-big-body">' + inner + '</div></details>';
 }
 
 // ═════ VALIDATION MODE UPDATE ═════

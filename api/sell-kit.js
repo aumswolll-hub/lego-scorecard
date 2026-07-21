@@ -18,7 +18,9 @@ export const config = {
 };
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-const ANTHROPIC_MODEL = process.env.SELLKIT_MODEL || process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
+// Haiku 4.5 = เร็วกว่า sonnet ~3-4 เท่า (founder: "gen นานเกินไป" 2026-07-21)
+// จงใจไม่ fallback ไป ANTHROPIC_MODEL — ตัวนั้นคือ sonnet ของ analyze-image (อ่านตัวเลขต้องแม่น)
+const ANTHROPIC_MODEL = process.env.SELLKIT_MODEL || "claude-haiku-4-5-20251001";
 const DEBUG_SCANNER = process.env.DEBUG_SCANNER === "true";
 const MAX_IMAGES = 15;
 
@@ -27,6 +29,16 @@ function cleanJsonText(text) {
     .replace(/```json/gi, "")
     .replace(/```/g, "")
     .trim();
+}
+
+// haiku ชอบแถมข้อความรอบ JSON — parse ตรงก่อน ถ้าไม่ได้ตัดเอาช่วง {...} นอกสุด
+function parseAiJson(text) {
+  const t = cleanJsonText(text);
+  try { return JSON.parse(t); } catch (e) {}
+  const s = t.indexOf("{");
+  const last = t.lastIndexOf("}");
+  if (s >= 0 && last > s) return JSON.parse(t.slice(s, last + 1));
+  throw new Error("no_json_found");
 }
 
 function fmt(v, suffix = "") {
@@ -315,7 +327,11 @@ async function callClaude(content, maxTokens) {
       model: ANTHROPIC_MODEL,
       max_tokens: maxTokens,
       temperature: 0.7,
-      messages: [{ role: "user", content }],
+      messages: [
+        { role: "user", content },
+        // prefill บังคับให้เริ่มตอบเป็น JSON ทันที (haiku ชอบเปิดด้วยข้อความ)
+        { role: "assistant", content: "{" },
+      ],
     }),
   });
 
@@ -328,11 +344,12 @@ async function callClaude(content, maxTokens) {
   }
 
   const aiData = await aiRes.json();
-  return (aiData.content || [])
+  const text = (aiData.content || [])
     .filter((b) => b.type === "text")
     .map((b) => b.text)
     .join("")
     .trim();
+  return "{" + text;
 }
 
 export default async function handler(req, res) {
@@ -391,7 +408,7 @@ export default async function handler(req, res) {
 
       let parsed;
       try {
-        parsed = JSON.parse(cleanJsonText(textOut));
+        parsed = parseAiJson(textOut);
       } catch (e) {
         console.error("[sell-kit script] parse error:", textOut.slice(0, 500));
         return res.status(502).json({ error: "parse_error", message: "AI ตอบไม่สมบูรณ์ — กดใหม่อีกครั้ง" });
@@ -435,7 +452,7 @@ export default async function handler(req, res) {
 
         let parsed;
         try {
-          parsed = JSON.parse(cleanJsonText(textOut));
+          parsed = parseAiJson(textOut);
         } catch (e) {
           console.error(`[sell-kit expand ${part}] parse error:`, textOut.slice(-400));
           return res.status(502).json({ error: "parse_error", message: "AI ตอบไม่สมบูรณ์ — กดใหม่อีกครั้ง" });
@@ -459,7 +476,7 @@ export default async function handler(req, res) {
 
         let parsed;
         try {
-          parsed = JSON.parse(cleanJsonText(textOut));
+          parsed = parseAiJson(textOut);
         } catch (e) {
           console.error("[sell-kit hooks] parse error:", textOut.slice(-400));
           return res.status(502).json({ error: "parse_error", message: "AI ตอบไม่สมบูรณ์ — กดใหม่อีกครั้ง" });
@@ -480,7 +497,7 @@ export default async function handler(req, res) {
 
       let parsed;
       try {
-        parsed = JSON.parse(cleanJsonText(textOut));
+        parsed = parseAiJson(textOut);
       } catch (e) {
         console.error("[sell-kit plan] parse error:", textOut.slice(-400));
         return res.status(502).json({ error: "parse_error", message: "AI ตอบไม่สมบูรณ์ — กดใหม่อีกครั้ง" });
@@ -532,7 +549,7 @@ export default async function handler(req, res) {
 
     let kit;
     try {
-      kit = JSON.parse(cleanJsonText(textOut));
+      kit = parseAiJson(textOut);
     } catch (e) {
       console.error("[sell-kit analyze] parse error:", textOut.slice(0, 500));
       return res.status(502).json({ error: "parse_error", message: "AI ตอบไม่สมบูรณ์ — กดใหม่อีกครั้ง" });
