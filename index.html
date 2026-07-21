@@ -982,6 +982,50 @@ body.lego-method-student .af-upsell { display: none !important; }
   .benchmark-block, .action-plan { padding: 18px 20px; }
 }
 
+/* ── SELL KIT — SCAN → SELL ในระบบเดียว ── */
+.sellkit { display: none; background: var(--ink); color: var(--cream); padding: 24px 28px; margin-bottom: 16px; border: 1.5px solid var(--gold); }
+.sellkit.active { display: block; }
+.sellkit-tag { display: inline-block; background: var(--gold); color: var(--ink); font-family: 'Fraunces', serif; font-weight: 700; font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; padding: 3px 10px; margin-bottom: 10px; }
+.sellkit-title { font-family: 'Fraunces', serif; font-weight: 700; font-size: 19px; line-height: 1.2; color: var(--cream); letter-spacing: -0.01em; margin-bottom: 6px; }
+.sellkit-title em { font-style: italic; color: var(--gold); }
+.sellkit-sub { font-size: 12.5px; color: rgba(245,239,230,0.65); line-height: 1.5; margin-bottom: 16px; }
+.sellkit-photo-drop { border: 1.5px dashed rgba(245,239,230,0.35); padding: 12px 14px; font-size: 12.5px; color: rgba(245,239,230,0.7); cursor: pointer; margin-bottom: 12px; transition: border-color .15s; }
+.sellkit-photo-drop:hover, .sellkit-photo-drop.dragover { border-color: var(--gold); color: var(--cream); }
+.sellkit-photo-drop.has-photo { border-style: solid; border-color: var(--gold); color: var(--gold); }
+.sellkit-btn { display: block; width: 100%; background: var(--gold); color: var(--ink); border: none; font-family: 'Fraunces', serif; font-weight: 700; font-size: 15px; padding: 13px 18px; cursor: pointer; letter-spacing: 0.02em; }
+.sellkit-btn:hover { filter: brightness(1.08); }
+.sellkit-btn:disabled { opacity: 0.55; cursor: wait; }
+.sellkit-status { font-size: 12.5px; margin-top: 10px; line-height: 1.55; color: rgba(245,239,230,0.8); }
+.sellkit-status .err { color: #F0A8A4; }
+.sellkit-out { margin-top: 18px; }
+.sellkit-section-label { font-family: 'Fraunces', serif; font-weight: 700; font-size: 11px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--gold); margin: 20px 0 10px; padding-bottom: 6px; border-bottom: 1px solid rgba(245,239,230,0.15); }
+.sellkit-analysis { font-size: 13.5px; line-height: 1.65; color: rgba(245,239,230,0.92); }
+.sellkit-analysis .headline { font-family: 'Fraunces', serif; font-size: 16px; font-weight: 700; color: var(--cream); margin-bottom: 8px; line-height: 1.35; }
+.sellkit-analysis ul { margin: 8px 0 0 18px; padding: 0; }
+.sellkit-analysis li { margin-bottom: 4px; }
+.sellkit-riskflag { background: rgba(240,138,133,0.12); border: 1px solid rgba(240,138,133,0.4); padding: 10px 12px; font-size: 12.5px; color: #F0C4C1; margin-top: 10px; line-height: 1.5; }
+.sellkit-angle { border: 1px solid rgba(245,239,230,0.18); padding: 14px 16px; margin-bottom: 10px; }
+.sellkit-angle.top { border-color: var(--gold); }
+.sellkit-angle-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+.sellkit-angle-rank { font-family: 'Fraunces', serif; font-weight: 900; font-size: 18px; color: var(--gold); }
+.sellkit-angle-name { font-weight: 700; font-size: 14px; color: var(--cream); }
+.sellkit-angle-body { font-size: 12.5px; line-height: 1.6; color: rgba(245,239,230,0.85); }
+.sellkit-angle-body b { color: var(--gold); font-weight: 600; }
+.sellkit-angle-hook { margin-top: 8px; font-style: italic; font-size: 13px; color: var(--cream); border-left: 3px solid var(--gold); padding-left: 10px; }
+.sellkit-script { border: 1px solid rgba(245,239,230,0.18); margin-bottom: 14px; }
+.sellkit-script-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid rgba(245,239,230,0.15); flex-wrap: wrap; }
+.sellkit-script-title { font-weight: 700; font-size: 13.5px; color: var(--cream); }
+.sellkit-script-meta { font-size: 11px; color: rgba(245,239,230,0.55); }
+.sellkit-copy-btn { background: transparent; border: 1px solid var(--gold); color: var(--gold); font-size: 11.5px; padding: 5px 12px; cursor: pointer; font-family: inherit; }
+.sellkit-copy-btn:hover { background: var(--gold); color: var(--ink); }
+.sellkit-copy-btn.copied { background: #8AD17F; border-color: #8AD17F; color: var(--ink); }
+.sellkit-script-body { padding: 12px 16px; }
+.sellkit-script-row { margin-bottom: 10px; }
+.sellkit-script-row .lbl { font-family: 'Fraunces', serif; font-weight: 700; font-size: 10.5px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--gold); }
+.sellkit-script-row .scene { font-size: 11.5px; color: rgba(245,239,230,0.55); font-style: italic; margin: 2px 0; }
+.sellkit-script-row .vo { font-size: 13.5px; line-height: 1.6; color: rgba(245,239,230,0.95); }
+@media (max-width: 720px) { .sellkit { padding: 18px 20px; } }
+
 /* ── Creator Insight Panel ── */
 .creator-insight { margin-top: 12px; background: var(--cream); border: 1.5px solid var(--ink); padding: 0; overflow: hidden; display: none; }
 .creator-insight.active { display: block; }
@@ -1380,6 +1424,7 @@ body.result-locked #resultMsg {
 
 body.result-locked #benchmarkBlock,
 body.result-locked #actionPlan,
+body.result-locked #sellKit,
 body.result-locked #upsellResult {
   display: none !important;
 }
@@ -1673,6 +1718,20 @@ body.result-locked .result-block::after {
       </div>
       <ol class="action-plan-steps" id="actionPlanSteps"></ol>
       <div class="action-plan-foot" id="actionPlanFoot"></div>
+    </div>
+
+    <!-- SELL KIT — สแกนเสร็จ ได้มุมขาย + สคริปต์พากย์ทันที ไม่ต้องไปเปิด AI ที่อื่น -->
+    <div class="sellkit" id="sellKit">
+      <span class="sellkit-tag">Sell Kit</span>
+      <h4 class="sellkit-title">สแกนแล้ว <em>ขายต่อเลย</em> — มุมขาย + สคริปต์พากย์เสียง</h4>
+      <div class="sellkit-sub">ระบบใช้ตัวเลขจริงจากผลสแกนด้านบน วิเคราะห์สินค้า → แตกมุมขาย 5 มุม → เขียนสคริปต์พากย์ 3 ตัวให้ทันที ไม่ต้องเอาผลไปวางใน AI ที่อื่น</div>
+      <div class="sellkit-photo-drop" id="sellkitPhotoDrop" onclick="document.getElementById('sellkitPhotoInput').click()">
+        📷 <span id="sellkitPhotoLabel">แนบรูปสินค้า (ไม่บังคับ — แต่แนบแล้วมุมขายแม่นขึ้นมาก)</span>
+        <input type="file" id="sellkitPhotoInput" accept="image/*" multiple style="display:none" onchange="sellkitHandlePhotos(this.files)">
+      </div>
+      <button class="sellkit-btn" id="sellkitBtn" onclick="generateSellKit()">🎬 สร้างแผนขาย + สคริปต์พากย์เสียง</button>
+      <div class="sellkit-status" id="sellkitStatus"></div>
+      <div class="sellkit-out" id="sellkitOut"></div>
     </div>
 
     <!-- Contextual upsell — shows after result is computed -->
@@ -3411,11 +3470,282 @@ function renderActionPlan(decision, mode) {
   stepsEl.innerHTML = steps.map(s => `<li>${s}</li>`).join("");
   footEl.innerHTML = foot;
   block.classList.add("active");
+
+  // SELL KIT เปิดพร้อม action plan
+  sellkitActivate();
 }
 
 function hideBenchmarkAndPlan() {
   document.getElementById("benchmarkBlock").classList.remove("active");
   document.getElementById("actionPlan").classList.remove("active");
+  document.getElementById("sellKit").classList.remove("active");
+}
+
+// ═════ SELL KIT — SCAN → SELL ในระบบเดียว ═════
+let sellkitPhotos = [];        // [{media_type, data}]
+let sellkitLastProductKey = ""; // ล้างผลเก่าเมื่อสินค้าเปลี่ยน
+let sellkitBusy = false;
+
+function sellkitActivate() {
+  const block = document.getElementById("sellKit");
+  if (!block) return;
+
+  const name = (document.getElementById("productName")?.value || "").trim();
+  const key = currentMode + "::" + name;
+
+  if (key !== sellkitLastProductKey) {
+    sellkitLastProductKey = key;
+    document.getElementById("sellkitOut").innerHTML = "";
+    document.getElementById("sellkitStatus").innerHTML = "";
+  }
+
+  block.classList.add("active");
+}
+
+function sellkitHandlePhotos(files) {
+  const arr = Array.from(files || []).slice(0, 2);
+  if (!arr.length) return;
+
+  Promise.all(arr.map(fileToBase64))
+    .then(imgs => {
+      sellkitPhotos = imgs;
+      const drop = document.getElementById("sellkitPhotoDrop");
+      drop.classList.add("has-photo");
+      document.getElementById("sellkitPhotoLabel").textContent =
+        `✓ แนบรูปสินค้าแล้ว ${imgs.length} รูป — กดเพื่อเปลี่ยน`;
+    })
+    .catch(e => {
+      document.getElementById("sellkitStatus").innerHTML =
+        `<span class="err">⚠ ${e.message || "อ่านรูปไม่สำเร็จ"}</span>`;
+    });
+}
+
+// เก็บผลสแกนจากฟอร์ม (โครงเดียวกับ saveProduct)
+function collectScanForSellKit() {
+  const name = (document.getElementById("productName")?.value || "").trim();
+
+  if (currentMode === "validation") {
+    const comm = num("v_commission");
+    const o7 = num("v_orders7"), o30 = num("v_orders30");
+    const ctr = num("v_ctr");
+    const atc7 = num("v_atc7"), atc30 = num("v_atc30");
+    const c7 = num("v_creators7"), c30 = num("v_creators30");
+    const stock = num("v_stock");
+
+    const sComm = vScoreCommission(comm);
+    const sOrders = vScoreOrders(o7, o30);
+    const sCTR = vScoreCTR(ctr);
+    const sATC = vScoreATC(atc7, atc30);
+    const sCVR = vScoreCVR(o30, atc30);
+    const sCreator = vScoreCreatorCombined(o30, c7, c30);
+    const sStock = vScoreStock(stock, o30);
+
+    const total = (sComm ?? 0) + (sOrders ?? 0) + (sCTR ?? 0) + (sATC ?? 0) + (sCVR ?? 0) + (sCreator ?? 0) + (sStock ?? 0);
+    const max = 21;
+    const pct = total / max;
+    const decision = pct >= 0.74 ? "VALIDATED" : pct >= 0.5 ? "RISKY" : "DEAD";
+    const cvr = (o30 && atc30) ? (o30 / atc30 * 100) : null;
+    const opc = (o30 && c30) ? (o30 / c30) : null;
+
+    const scoreMap = [
+      ["Commission", sComm], ["Orders momentum", sOrders], ["CTR", sCTR],
+      ["Add-to-cart", sATC], ["CVR", sCVR], ["Creator", sCreator], ["Stock", sStock],
+    ];
+    const minScore = Math.min(...scoreMap.map(([, s]) => s ?? 3));
+    const weakest = minScore >= 3 ? [] :
+      scoreMap.filter(([, s]) => (s ?? 3) === minScore).map(([l]) => l);
+
+    return {
+      name, mode: "validation", decision, total, max, pct, weakest,
+      metrics: { commission: comm, orders7: o7, orders30: o30, ctr, atc7, atc30, creators7: c7, creators30: c30, stock, cvr, opc },
+      scores: { sComm, sOrders, sCTR, sATC, sCVR, sCreator, sStock },
+    };
+  }
+
+  // Discovery mode
+  const comm = num("commission"), d7 = num("gmv7"), d30 = num("gmv30");
+  const cr = num("cr"), conc = num("conc"), creators = num("creators");
+  const sComm = scoreCommission(comm), sDemand = scoreDemand(d7, d30);
+  const sAng = scoreAngles(), sProb = scoreProbability(cr), sConc = scoreConcentration(conc);
+  const hasComm = comm !== null;
+  let total = (sDemand ?? 0) + (sAng ?? 0) + (sProb ?? 0) + (sConc ?? 0);
+  if (hasComm) total += (sComm ?? 0);
+  const max = hasComm ? 15 : 12;
+  const pct = total / max;
+  const decision = pct >= 0.74 ? "PICK" : pct >= 0.5 ? "WAIT" : "DROP";
+  const angles = [];
+  for (let i = 1; i <= 5; i++) {
+    const v = document.getElementById("angle" + i)?.value.trim();
+    if (v) angles.push(v);
+  }
+
+  return {
+    name, mode: "discovery", decision, total, max, pct, weakest: [],
+    metrics: { commission: comm, gmv7: d7, gmv30: d30, creators, cr, conc, angles },
+    scores: { sComm, sDemand, sAngles: sAng, sProb, sConc },
+  };
+}
+
+async function generateSellKit() {
+  if (sellkitBusy) return;
+
+  if (!currentSession?.token) {
+    document.getElementById("sellkitStatus").innerHTML =
+      `<span class="err">⚠ ต้อง login ก่อนใช้ Sell Kit</span>`;
+    return;
+  }
+
+  const product = collectScanForSellKit();
+
+  if (!product.name) {
+    document.getElementById("sellkitStatus").innerHTML =
+      `<span class="err">⚠ กรอกชื่อสินค้าก่อน — ระบบต้องรู้ว่ากำลังขายอะไร</span>`;
+    return;
+  }
+
+  const btn = document.getElementById("sellkitBtn");
+  const status = document.getElementById("sellkitStatus");
+  const out = document.getElementById("sellkitOut");
+
+  sellkitBusy = true;
+  btn.disabled = true;
+  btn.textContent = "⟳ กำลังวิเคราะห์ + เขียนสคริปต์... (ประมาณ 1-2 นาที)";
+  status.innerHTML = "ระบบกำลังอ่านตัวเลขจากผลสแกน แตกมุมขาย และเขียนสคริปต์พากย์ — ขั้นตอนเดียวจบ ไม่ต้องไปวางที่อื่น";
+
+  try {
+    const res = await fetch("/api/sell-kit", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-session-token": currentSession.token,
+      },
+      body: JSON.stringify({ product, images: sellkitPhotos }),
+    });
+
+    const result = await res.json().catch(() => null);
+
+    if (res.status === 429) {
+      status.innerHTML = `<span class="err">⚠ ${result?.message || "ใช้ครบจำนวนครั้งแล้ว"}</span> <span class="af-upsell" onclick="goToUpgrade(event)" style="color:var(--gold);text-decoration:underline;cursor:pointer">เข้า LEGO METHOD เพื่อใช้ไม่จำกัด →</span>`;
+      return;
+    }
+
+    if (res.status === 401) {
+      status.innerHTML = `<span class="err">⚠ Session หมดอายุ — logout แล้ว login ใหม่</span>`;
+      return;
+    }
+
+    if (!res.ok || !result?.ok || !result.kit) {
+      status.innerHTML = `<span class="err">⚠ ${result?.message || "สร้างไม่สำเร็จ — ลองใหม่อีกครั้ง"}</span>`;
+      return;
+    }
+
+    let usageTxt = "";
+    if (result.usage && !result.usage.unlimited) {
+      usageTxt = ` · ใช้ AI ไป ${result.usage.used}/${result.usage.limit} ครั้งเดือนนี้`;
+    }
+    status.innerHTML = `✓ แผนขายพร้อมแล้ว — เลื่อนดูด้านล่าง กดปุ่ม copy เพื่อเอาสคริปต์ไปพากย์ได้เลย${usageTxt}`;
+    renderSellKit(result.kit);
+    out.scrollIntoView({ behavior: "smooth", block: "start" });
+  } catch (e) {
+    status.innerHTML = `<span class="err">⚠ เกิดข้อผิดพลาด: ${e.message || e} — ลองใหม่อีกครั้ง</span>`;
+  } finally {
+    sellkitBusy = false;
+    btn.disabled = false;
+    btn.textContent = "🎬 สร้างแผนขาย + สคริปต์พากย์เสียง";
+  }
+}
+
+function skEsc(s) {
+  return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function renderSellKit(kit) {
+  const out = document.getElementById("sellkitOut");
+  const a = kit.analysis || {};
+  let html = "";
+
+  // 1) บทวิเคราะห์
+  html += `<div class="sellkit-section-label">① บทวิเคราะห์จากตัวเลขจริง</div>`;
+  html += `<div class="sellkit-analysis">`;
+  if (a.headline) html += `<div class="headline">${skEsc(a.headline)}</div>`;
+  if (a.market_read) html += `<div>${skEsc(a.market_read)}</div>`;
+  if (Array.isArray(a.strengths) && a.strengths.length) {
+    html += `<ul>${a.strengths.map(s => `<li>✅ ${skEsc(s)}</li>`).join("")}</ul>`;
+  }
+  if (Array.isArray(a.risks) && a.risks.length) {
+    html += `<ul>${a.risks.map(s => `<li>⚠️ ${skEsc(s)}</li>`).join("")}</ul>`;
+  }
+  html += `</div>`;
+  if (Array.isArray(a.risk_flags) && a.risk_flags.length) {
+    html += `<div class="sellkit-riskflag">🚫 <b>คำ/เคลมต้องห้ามของสินค้านี้ (กันบัญชีโดนแบน):</b> ${a.risk_flags.map(skEsc).join(" · ")}</div>`;
+  }
+
+  // 2) มุมขาย 5 มุม
+  const angles = Array.isArray(kit.angles) ? kit.angles : [];
+  html += `<div class="sellkit-section-label">② มุมขาย ${angles.length} มุม — เรียงตามโอกาสชนะ</div>`;
+  angles.forEach(g => {
+    html += `<div class="sellkit-angle${(g.rank <= 3) ? " top" : ""}">
+      <div class="sellkit-angle-head"><span class="sellkit-angle-rank">#${skEsc(g.rank)}</span><span class="sellkit-angle-name">${skEsc(g.name)}</span></div>
+      <div class="sellkit-angle-body">
+        <b>ใคร:</b> ${skEsc(g.persona)} · <b>เจ็บเรื่อง:</b> ${skEsc(g.pain)}<br>
+        <b>สินค้าเปลี่ยนอะไร:</b> ${skEsc(g.promise)}<br>
+        <b>ตัวเลขที่หนุนมุมนี้:</b> ${skEsc(g.data_signal)}
+      </div>
+      ${g.hook_example ? `<div class="sellkit-angle-hook">"${skEsc(g.hook_example)}"</div>` : ""}
+    </div>`;
+  });
+
+  // 3) สคริปต์พากย์เสียง
+  const scripts = Array.isArray(kit.scripts) ? kit.scripts : [];
+  html += `<div class="sellkit-section-label">③ สคริปต์พากย์เสียง ${scripts.length} ตัว — อ่านได้ทันที</div>`;
+  scripts.forEach((sc, i) => {
+    const secs = Array.isArray(sc.sections) ? sc.sections : [];
+    html += `<div class="sellkit-script">
+      <div class="sellkit-script-head">
+        <div>
+          <div class="sellkit-script-title">สคริปต์ ${i + 1}: ${skEsc(sc.angle_name)}</div>
+          <div class="sellkit-script-meta">Hook แบบ${skEsc(sc.hook_family)} · ~${skEsc(sc.duration_sec)} วินาที</div>
+        </div>
+        <button class="sellkit-copy-btn" onclick="sellkitCopy(this, ${i})">📋 Copy สคริปต์</button>
+      </div>
+      <div class="sellkit-script-body">
+        ${secs.map(s => `<div class="sellkit-script-row">
+          <span class="lbl">${skEsc(s.label)}</span>
+          ${s.scene ? `<div class="scene">${skEsc(s.scene)}</div>` : ""}
+          <div class="vo">${skEsc(s.vo)}</div>
+        </div>`).join("")}
+      </div>
+    </div>`;
+  });
+
+  out.innerHTML = html;
+  window.__sellkitScripts = scripts;
+}
+
+function sellkitCopy(btn, idx) {
+  const sc = (window.__sellkitScripts || [])[idx];
+  if (!sc) return;
+
+  const text = sc.full_vo ||
+    (sc.sections || []).map(s => s.vo).filter(Boolean).join("\n");
+
+  const done = () => {
+    btn.classList.add("copied");
+    btn.textContent = "✓ Copy แล้ว";
+    setTimeout(() => { btn.classList.remove("copied"); btn.textContent = "📋 Copy สคริปต์"; }, 2000);
+  };
+
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(() => {});
+  } else {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    document.body.removeChild(ta);
+    done();
+  }
 }
 
 // ═════ VALIDATION MODE UPDATE ═════
