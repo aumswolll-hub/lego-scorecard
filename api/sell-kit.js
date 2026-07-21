@@ -1,8 +1,11 @@
 // ════════════════════════════════════════════════
-// /api/sell-kit.js — SCAN → SELL ในระบบเดียว
-// รับผลสแกน (ตัวเลข + คะแนน + decision) + รูปสินค้า (optional)
-// → คืน 1) บทวิเคราะห์  2) มุมขาย 5 มุม  3) สคริปต์พากย์เสียง 3 ตัว
-// ลูกค้าไม่ต้องเอาผลไปวางใน Gemini/ChatGPT อีกต่อไป
+// /api/sell-kit.js — MAGIC BUTTON: ภาพ → มุมขาย → สคริปต์ตามฉากที่ถ่ายได้จริง
+//
+// 2 จังหวะ (แก้ปัญหา "AI คิดนานเกินไป" ของ flow เดิมที่ทำทุกอย่างใน call เดียว):
+//   stage "analyze" — รูปสินค้า+กราฟกี่รูปก็ได้ (สูงสุด 15) + ตัวเลขจากฟอร์ม (ถ้ามี)
+//                     → บทวิเคราะห์ + มุมขาย 5 มุม (ยังไม่เขียนสคริปต์ = เร็ว)
+//   stage "script"  — มุมที่เลือก + ความยาว + สไตล์ถ่าย + ฉาก/สถานที่ที่ user ถ่ายได้จริง
+//                     → สคริปต์ 1 ตัว เขียนเฉพาะฉากที่มีจริงเท่านั้น
 // ════════════════════════════════════════════════
 
 import { resolveSessionIdentity, getSessionToken, sbRest, configMissing } from "./_auth-helpers.js";
@@ -17,6 +20,7 @@ export const config = {
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const ANTHROPIC_MODEL = process.env.SELLKIT_MODEL || process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
 const DEBUG_SCANNER = process.env.DEBUG_SCANNER === "true";
+const MAX_IMAGES = 15;
 
 function cleanJsonText(text) {
   return String(text || "")
@@ -30,89 +34,64 @@ function fmt(v, suffix = "") {
   return `${v}${suffix}`;
 }
 
-// สรุปผลสแกนเป็นข้อความให้ AI อ่าน — ส่งเฉพาะที่มีจริง ไม่เดา
+// สรุปผลสแกนจากฟอร์ม (optional — magic button ทำงานได้จากภาพล้วนๆ)
 function buildScanBrief(p) {
+  if (!p || !p.metrics) return "";
+  const m = p.metrics;
+  const s = p.scores || {};
   const lines = [];
-  lines.push(`ชื่อสินค้า: ${p.name || "ไม่ระบุ"}`);
-  lines.push(`โหมดสแกน: ${p.mode === "discovery" ? "Discovery (สำรวจตลาด)" : "Validation (ตัวเลขจริงจาก TikTok)"}`);
-  lines.push(`ผลตัดสิน: ${p.decision} (คะแนนรวม ${p.total}/${p.max} = ${Math.round((p.pct || 0) * 100)}%)`);
+  lines.push(`\n════ ตัวเลขจากฟอร์ม Scanner (user ตรวจแล้ว — ถ้าขัดกับที่อ่านได้จากภาพ ให้เชื่อฟอร์ม) ════`);
+  if (p.name) lines.push(`ชื่อสินค้า: ${p.name}`);
+  if (p.decision) lines.push(`ผลตัดสิน Scanner: ${p.decision} (${p.total}/${p.max} = ${Math.round((p.pct || 0) * 100)}%)`);
 
-  if (p.mode === "validation") {
-    lines.push(`— ตัวเลขจาก TikTok Promotion Info —`);
-    lines.push(`Commission: ${fmt(p.metrics.commission, "%")} (คะแนน ${fmt(p.scores.sComm)}/3)`);
-    lines.push(`Orders 7 วัน: ${fmt(p.metrics.orders7)} | Orders 30 วัน: ${fmt(p.metrics.orders30)} (momentum score ${fmt(p.scores.sOrders)}/3)`);
-    lines.push(`CTR: ${fmt(p.metrics.ctr, "%")} (คะแนน ${fmt(p.scores.sCTR)}/3) — CTR สูง = มุมคอนเทนต์ที่มีอยู่ในตลาดตอนนี้หยุดนิ้วคนได้`);
-    lines.push(`Add-to-cart 7 วัน: ${fmt(p.metrics.atc7)} | 30 วัน: ${fmt(p.metrics.atc30)} (คะแนน ${fmt(p.scores.sATC)}/3)`);
-    lines.push(`CVR (orders30/ATC30): ${fmt(p.metrics.cvr ? p.metrics.cvr.toFixed(1) : null, "%")} (คะแนน ${fmt(p.scores.sCVR)}/3) — CVR สูง = คนใส่ตะกร้าแล้วตัดสินใจซื้อง่าย`);
-    lines.push(`Creators 7 วัน: ${fmt(p.metrics.creators7)} | 30 วัน: ${fmt(p.metrics.creators30)} | Orders/Creator: ${fmt(p.metrics.opc ? p.metrics.opc.toFixed(1) : null)} (คะแนน ${fmt(p.scores.sCreator)}/3) — orders/creator สูง + creators น้อย = ช่องว่างให้แทรก`);
-    lines.push(`Stock: ${fmt(p.metrics.stock)} (คะแนน ${fmt(p.scores.sStock)}/3)`);
+  if (p.mode === "discovery") {
+    lines.push(`Commission: ${fmt(m.commission, "%")} | GMV 7d: ${fmt(m.gmv7)} | GMV 30d: ${fmt(m.gmv30)} | creators: ${fmt(m.creators)}`);
+    if (Array.isArray(m.angles) && m.angles.length) lines.push(`มุมที่ user คิดไว้เอง: ${m.angles.join(" / ")}`);
   } else {
-    lines.push(`— ข้อมูลโหมดสำรวจ —`);
-    lines.push(`Commission: ${fmt(p.metrics.commission, "%")}`);
-    lines.push(`GMV 7 วัน: ${fmt(p.metrics.gmv7)} | GMV 30 วัน: ${fmt(p.metrics.gmv30)}`);
-    lines.push(`จำนวน creators ในตลาด: ${fmt(p.metrics.creators)}`);
-    if (Array.isArray(p.metrics.angles) && p.metrics.angles.length) {
-      lines.push(`มุมขายที่ผู้ใช้คิดไว้เอง: ${p.metrics.angles.join(" / ")}`);
-    }
+    lines.push(`Commission: ${fmt(m.commission, "%")} (score ${fmt(s.sComm)}/3)`);
+    lines.push(`Orders 7d/30d: ${fmt(m.orders7)}/${fmt(m.orders30)} (momentum ${fmt(s.sOrders)}/3)`);
+    lines.push(`CTR: ${fmt(m.ctr, "%")} (${fmt(s.sCTR)}/3) — CTR สูง = มุมที่ตลาดใช้อยู่หยุดนิ้วได้`);
+    lines.push(`ATC 7d/30d: ${fmt(m.atc7)}/${fmt(m.atc30)} (${fmt(s.sATC)}/3)`);
+    lines.push(`CVR: ${fmt(m.cvr ? Number(m.cvr).toFixed(1) : null, "%")} (${fmt(s.sCVR)}/3) — สูง = ใส่ตะกร้าแล้วซื้อง่าย`);
+    lines.push(`Creators 7d/30d: ${fmt(m.creators7)}/${fmt(m.creators30)} | Orders/Creator: ${fmt(m.opc ? Number(m.opc).toFixed(1) : null)} (${fmt(s.sCreator)}/3)`);
+    lines.push(`Stock: ${fmt(m.stock)} (${fmt(s.sStock)}/3)`);
   }
-
-  if (p.weakest && p.weakest.length) {
-    lines.push(`จุดอ่อนที่คะแนนต่ำสุด: ${p.weakest.join(", ")}`);
-  }
+  if (Array.isArray(p.weakest) && p.weakest.length) lines.push(`จุดอ่อนคะแนนต่ำสุด: ${p.weakest.join(", ")}`);
   return lines.join("\n");
 }
 
-const SELL_KIT_PROMPT = `คุณคือ LEGO SELL KIT — เครื่องยนต์สร้างแผนขายของ LEGO METHOD™
-คุณได้รับผลสแกนสินค้า TikTok affiliate ที่ผ่านการให้คะแนนด้วยสูตรจริง (ไม่ใช่ความรู้สึก) และอาจได้รับรูปสินค้าประกอบ
+// กฎร่วมที่ทุก stage ต้องเคารพ
+const SHARED_RULES = `กฎเหล็ก (ห้ามละเมิด):
+- ผู้ฟังของมุมขายและสคริปต์คือ "คนซื้อสินค้าไปใช้เอง" เท่านั้น ห้ามพูดกับ creator/นายหน้า
+- ตัวเลขระบบ (commission / CVR / ATC / orders-per-creator / จำนวน creators) ใช้วิเคราะห์ได้ แต่ห้ามหลุดเข้าบทพูดเด็ดขาด
+- ห้ามเคลมทางยา/รักษา/ลดน้ำหนักเกินจริง สินค้าเสริม/สกินแคร์พูดได้แค่ประสบการณ์ใช้ + สิ่งที่เห็นได้
+- ห้ามแต่งตัวเลขที่ไม่มีในข้อมูล ห้าม urgency ปลอม
+- ภาษาพูดจริงแบบคลิป TikTok ไทย ประโยคสั้น ไม่มีภาษาโฆษณา`;
 
-ภารกิจ: เปลี่ยนผลสแกนเป็นแผนขายที่ใช้ได้ทันที 3 ชั้น
-1. บทวิเคราะห์สินค้า — อิงตัวเลขจริงจากผลสแกนเท่านั้น ห้ามแต่งตัวเลขเพิ่ม
-2. มุมขาย 5 มุม — เรียงตามโอกาสชนะ
-3. สคริปต์พากย์เสียง 3 ตัว — จาก 3 มุมที่ดีที่สุด อ่านออกเสียงได้ทันที
+const ANALYZE_PROMPT = `คุณคือ LEGO SELL KIT — เครื่องยนต์เปลี่ยน "ภาพสินค้า + กราฟ" ให้กลายเป็นมุมขายที่ใช้ได้ทันที
 
-หลักคิดมุมขาย (กฎเหล็กของ LEGO METHOD):
-- 1 สินค้า แตกได้หลายมุมขาย — แต่ละมุมคือ "คนแบบไหน × เจ็บเรื่องอะไร" ไม่ใช่ฟีเจอร์สินค้า
-- ห้ามใช้มุมแบบ "สินค้าตัวนี้ดีมาก" — ต้องเป็น "ถ้าคุณเป็นคนที่…แล้วเจอปัญหา…"
-- ทุกมุมต้องผูกกับสัญญาณจากตัวเลขจริง เช่น:
-  - CTR สูง = มุมที่ตลาดใช้อยู่ work แล้ว → บอกว่ามุมตลาดหลักคืออะไร แล้วหา "มุมต่าง" ที่ยังว่าง
-  - CVR สูง = สินค้าปิดการขายตัวเองได้ → สคริปต์เน้นพาไปดูตะกร้า ไม่ต้องขายหนัก
-  - CVR ต่ำ + ATC สูง = คนลังเลตอนจ่าย → มุมต้องฆ่าความลังเล (ราคา/ความเสี่ยง/ของแท้)
-  - Orders/Creator สูง + creators น้อย = ช่องว่างตลาด → เข้าเร็ว ก่อนคนแห่ตาม
-  - Momentum ชะลอ = อย่าเล่นมุมเดิมของตลาด ต้องมุมใหม่เท่านั้น
-- ถ้ามีรูปสินค้า: ใช้สิ่งที่เห็นจริงในรูป (รูปทรง สี การใช้งาน จุดเด่นที่มองเห็น) มาเป็นวัตถุดิบมุมขาย ห้ามเดาสรรพคุณที่มองไม่เห็น
+สิ่งที่คุณจะได้รับ: รูปภาพหลายรูป (อาจเป็นรูปสินค้า, screenshot TikTok Promotion info, กราฟยอดขาย, หน้าร้านคู่แข่ง — ผสมกันได้) และอาจมีตัวเลขจากฟอร์ม Scanner แนบมา
 
-กฎสำคัญที่สุด — ผู้ฟังของมุมขายและสคริปต์คือ "คนซื้อสินค้า" (end buyer) เท่านั้น:
-- ห้ามสร้างมุมที่ persona เป็น creator/นายหน้า/คนอยากขายของ — คนดูคลิปคือคนที่จะซื้อสินค้าไปใช้เอง
-- ตัวเลข commission / CVR / ATC / orders-per-creator / จำนวน creators คือข้อมูลภายในสำหรับวิเคราะห์เท่านั้น ห้ามหลุดเข้าไปในบทพูดเด็ดขาด
-- Believability ในสคริปต์ใช้ได้เฉพาะสิ่งที่คนซื้อเห็นเองได้จริง เช่น ยอดขายบนหน้าสินค้า รีวิว หรือสิ่งที่เห็นในคลิป
+ขั้นตอน:
+1. แยกประเภทรูปแต่ละรูป: รูปสินค้า / กราฟ-ตัวเลข / อื่นๆ
+2. จากรูปสินค้า: ระบุว่าสินค้าคืออะไร รูปทรง จุดเด่นที่มองเห็น การใช้งาน (ห้ามเดาสรรพคุณที่มองไม่เห็น)
+3. จากกราฟ/ตัวเลข: อ่านแบบ conservative — ไม่ชัดไม่ต้องใช้ ห้ามเดา (ถ้ามีตัวเลขจากฟอร์มให้เชื่อฟอร์มก่อน)
+4. วิเคราะห์ตลาด: ใครซื้อ ทำไมตอนนี้ คู่แข่งหนาแน่นไหม สัญญาณอะไรบอกโอกาส/ความเสี่ยง
+5. แตกมุมขาย 5 มุม เรียงตามโอกาสชนะ
 
-กฎสคริปต์พากย์เสียง:
-- ความยาวพูดจริง 30–60 วินาที (ประมาณ 80–150 คำไทย)
-- โครง 6 ท่อนตามอารมณ์ (arc ที่พิสูจน์แล้วของ LEGO METHOD): Hook (0–3 วิ หยุดนิ้ว) → Pain (ตอกปัญหา) → ขยี้ (ขยายให้เห็นภาพ + สิ่งที่เสียถ้าปล่อยไว้) → Mechanism (สินค้าแก้ยังไง — สาธิต/โชว์ ไม่ใช่เคลม) → กันข้อสงสัย (ตอบ 1 ข้อลังเลที่ใหญ่ที่สุดก่อนซื้อ สั้นๆ) → CTA (กดตะกร้า)
-- Hook เลือกจาก 3 ตระกูล: ปัญหา / ความอยาก / ขัดความเชื่อ — สคริปต์ 3 ตัวต้องใช้ hook คนละตระกูล
-- ภาษาพูดจริงแบบคลิป TikTok ไทย ประโยคสั้น ไม่มีคำหรู ไม่มีภาษาโฆษณา
-- ใส่ [ฉาก: …] สั้นๆ หน้าแต่ละท่อน บอกว่าถ่ายอะไรประกอบ
-- CTA ห้ามเวอร์ ห้ามกดดันปลอม — ใช้เหตุผลจริงจากตัวเลข (เช่น stock เหลือน้อยจริงค่อยพูดเรื่อง stock)
+หลักคิดมุมขาย: แต่ละมุม = "คนแบบไหน × เจ็บเรื่องอะไร" ไม่ใช่ฟีเจอร์สินค้า ห้ามมุม "สินค้าตัวนี้ดีมาก" — ต้องเป็น "ถ้าคุณเป็นคนที่…เจอปัญหา…" และ 5 มุมต้องคนละ pain คนละกลุ่มคนจริงๆ
 
-กฎความปลอดภัย TikTok (สำคัญมาก — บัญชีผู้ใช้โดนแบนได้จริง):
-- ห้ามเคลมทางยา/รักษา/ลดน้ำหนักเกินจริง (เช่น "หายขาด" "ลด 10 โลใน 7 วัน" "รักษาสิว")
-- สินค้ากลุ่มอาหารเสริม/สกินแคร์: พูดได้แค่ประสบการณ์การใช้ + สิ่งที่เห็นได้ ห้ามอ้างผลลัพธ์ทางการแพทย์
-- ห้ามการันตีรายได้หรือผลลัพธ์
-- ถ้าสินค้าอยู่ในกลุ่มเสี่ยง ให้ระบุคำต้องห้ามของสินค้านี้ใน risk_flags
+${SHARED_RULES}
 
-ความซื่อสัตย์:
-- ถ้าผลตัดสินคือ DEAD/DROP: วิเคราะห์ตรงๆ ว่าทำไมไม่ควรลงแรง และมุม/สคริปต์ให้ทำเฉพาะแบบ "ทดสอบต้นทุนต่ำ" พร้อมบอกชัดว่านี่คือสินค้าความเสี่ยงสูง
-- ถ้าผลคือ RISKY/WAIT: บอกชัดว่าจุดอ่อนคืออะไร และมุมขายต้องชดเชยจุดอ่อนตรงไหน
-- ห้ามเติมตัวเลขที่ไม่มีในข้อมูล
-
-ตอบเป็น JSON เท่านั้น ห้ามมีข้อความอื่น ห้าม markdown:
+ตอบเป็น JSON เท่านั้น ห้าม markdown:
 {
+  "product_name": "<ชื่อ/ประเภทสินค้าที่ระบุได้จากภาพหรือฟอร์ม>",
   "analysis": {
-    "headline": "<สรุป 1 ประโยคว่าสินค้านี้น่าเล่นแค่ไหน เพราะอะไร>",
-    "market_read": "<อ่านตลาดจากตัวเลข 2-4 ประโยค: ใครซื้อ ทำไมตอนนี้ คู่แข่งหนาแน่นแค่ไหน>",
-    "strengths": ["<จุดแข็งอิงตัวเลข>", "..."],
-    "risks": ["<ความเสี่ยงอิงตัวเลข>", "..."],
-    "risk_flags": ["<คำ/เคลมต้องห้ามสำหรับสินค้านี้ ถ้าไม่มีให้ []>"]
+    "headline": "<1 ประโยค: น่าเล่นแค่ไหน เพราะอะไร>",
+    "market_read": "<2-4 ประโยค: ใครซื้อ ทำไมตอนนี้ คู่แข่ง อ้างสิ่งที่เห็นจากภาพ/ตัวเลขจริง>",
+    "strengths": ["<จุดแข็ง อิงภาพ/ตัวเลขจริง>"],
+    "risks": ["<ความเสี่ยง อิงภาพ/ตัวเลขจริง>"],
+    "risk_flags": ["<คำ/เคลมต้องห้ามของสินค้านี้ ถ้าไม่มีให้ []>"]
   },
   "angles": [
     {
@@ -121,29 +100,96 @@ const SELL_KIT_PROMPT = `คุณคือ LEGO SELL KIT — เครื่อ
       "persona": "<คนแบบไหน>",
       "pain": "<เจ็บเรื่องอะไร>",
       "promise": "<สินค้าเปลี่ยนอะไรให้เขา>",
-      "data_signal": "<ตัวเลขไหนจากผลสแกนที่บอกว่ามุมนี้มีโอกาส>",
-      "hook_example": "<ประโยคเปิดตัวอย่าง 1 ประโยค>"
+      "data_signal": "<สิ่งที่เห็นจากภาพ/ตัวเลขที่บอกว่ามุมนี้มีโอกาส>",
+      "hook_example": "<ประโยคเปิด 1 ประโยค>"
     }
-    // 5 มุม เรียง rank 1-5
-  ],
-  "scripts": [
-    {
-      "angle_rank": 1,
-      "angle_name": "<ชื่อมุม>",
-      "hook_family": "<ปัญหา|ความอยาก|ขัดความเชื่อ>",
-      "duration_sec": <30-45>,
-      "sections": [
-        { "label": "Hook", "scene": "<[ฉาก] สั้นๆ>", "vo": "<คำพูด>" },
-        { "label": "Pain", "scene": "...", "vo": "..." },
-        { "label": "ขยี้", "scene": "...", "vo": "..." },
-        { "label": "Mechanism", "scene": "...", "vo": "..." },
-        { "label": "กันข้อสงสัย", "scene": "...", "vo": "..." },
-        { "label": "CTA", "scene": "...", "vo": "..." }
-      ]
-    }
-    // 3 สคริปต์ จากมุม rank 1-3
   ]
+}
+(angles ครบ 5 มุม เรียง rank 1-5 — กระชับ ไม่ต้องน้ำเยอะ)`;
+
+function buildScriptPrompt({ productName, analysisBrief, angle, options }) {
+  const duration = Math.min(180, Math.max(15, parseInt(options.duration_sec, 10) || 30));
+  const style = String(options.style || "แบบไหนก็ได้").slice(0, 100);
+  const scenes = String(options.scenes || "").trim().slice(0, 600);
+
+  // จำนวนท่อนตามความยาว — คลิปสั้นไม่ต้องครบ 6 ท่อน
+  let beatGuide;
+  if (duration <= 20) beatGuide = "4 ท่อน: Hook → Pain → Mechanism → CTA (สั้น กระชับ ทุกวินาทีมีค่า)";
+  else if (duration <= 45) beatGuide = "5-6 ท่อน: Hook → Pain → ขยี้ → Mechanism → (กันข้อสงสัยถ้าจำเป็น) → CTA";
+  else beatGuide = "6-7 ท่อน: Hook → Pain → ขยี้ (ขยาย + สิ่งที่เสียถ้าปล่อยไว้) → Mechanism/สาธิต → เหตุผลว่าทำไมต้องตัวนี้ → กันข้อสงสัย → CTA";
+
+  return `คุณคือมือเขียนสคริปต์คลิป TikTok ขายของ — เขียนสคริปต์ 1 ตัวจากมุมขายที่เลือกไว้แล้ว ให้ถ่ายได้จริงตามเงื่อนไขของคนถ่าย
+
+สินค้า: ${productName}
+${analysisBrief ? `บริบทจากการวิเคราะห์: ${analysisBrief}` : ""}
+
+มุมขายที่เลือก:
+- ชื่อมุม: ${angle.name}
+- คนซื้อ: ${angle.persona}
+- Pain: ${angle.pain}
+- Promise: ${angle.promise}
+${angle.hook_example ? `- แนว hook: ${angle.hook_example}` : ""}
+
+เงื่อนไขการถ่ายของ user (สำคัญมาก — เขียนเกินกว่านี้ไม่ได้):
+- ความยาวคลิป: ~${duration} วินาที (คำพูดประมาณ ${Math.round(duration * 2.5)} คำไทย)
+- สไตล์การถ่าย: ${style}
+- ฉาก/สถานที่/อุปกรณ์ที่ถ่ายได้จริง: ${scenes || "ไม่ระบุ — ใช้ฉากพื้นฐานที่ใครก็ถ่ายได้ (ห้องในบ้าน + มีสินค้าจริง 1 ชิ้น)"}
+
+กฎการเขียนฉาก:
+- ทุก [ฉาก] ต้องถ่ายได้ด้วยสิ่งที่ user บอกว่ามีเท่านั้น ห้ามสั่งฉากที่เขาไม่มี (เช่น ห้ามสั่ง "ถ่ายที่ออฟฟิศ" ถ้าเขาบอกว่ามีแค่ห้องนอน)
+- CTA ต้องปิดที่ตะกร้า TikTok Shop เสมอ ("กดตะกร้าด้านล่าง" / "กดดูในตะกร้า") — ห้ามใช้ "ลิงก์ใน bio"
+- ถ้าสไตล์คือพากย์เสียงทับ b-roll: vo = เสียงพากย์ล้วน ฉาก = ภาพสินค้า/การใช้งานที่ถ่ายได้
+- ถ้าสไตล์คือพูดหน้ากล้อง: vo = คำพูดหน้ากล้อง ธรรมชาติเหมือนเล่าให้เพื่อนฟัง
+- โครง: ${beatGuide}
+
+${SHARED_RULES}
+
+ตอบเป็น JSON เท่านั้น:
+{
+  "script": {
+    "angle_name": "${angle.name}",
+    "duration_sec": ${duration},
+    "style": "${style}",
+    "hook_family": "<ปัญหา|ความอยาก|ขัดความเชื่อ>",
+    "sections": [
+      { "label": "<ชื่อท่อน>", "scene": "<[ฉาก] ที่ถ่ายได้จริงตามเงื่อนไข>", "vo": "<คำพูด>" }
+    ],
+    "shooting_note": "<เคล็ดลับถ่าย 1-2 ประโยคสำหรับฉากที่ user มี>"
+  }
 }`;
+}
+
+async function callClaude(content, maxTokens) {
+  const aiRes = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: ANTHROPIC_MODEL,
+      max_tokens: maxTokens,
+      temperature: 0.7,
+      messages: [{ role: "user", content }],
+    }),
+  });
+
+  if (!aiRes.ok) {
+    const errTxt = await aiRes.text();
+    const err = new Error(`claude_${aiRes.status}`);
+    err.status = aiRes.status;
+    err.detail = errTxt.slice(0, 500);
+    throw err;
+  }
+
+  const aiData = await aiRes.json();
+  return (aiData.content || [])
+    .filter((b) => b.type === "text")
+    .map((b) => b.text)
+    .join("")
+    .trim();
+}
 
 export default async function handler(req, res) {
   res.setHeader("Content-Type", "application/json");
@@ -151,11 +197,9 @@ export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "method_not_allowed" });
   }
-
   if (!ANTHROPIC_API_KEY) {
     return res.status(500).json({ error: "config_error", message: "ยังไม่ได้ตั้ง ANTHROPIC_API_KEY" });
   }
-
   if (configMissing()) {
     return res.status(500).json({ error: "config_error", message: "ยังไม่ได้ตั้ง SUPABASE_URL หรือ SUPABASE_SERVICE_ROLE_KEY" });
   }
@@ -170,14 +214,62 @@ export default async function handler(req, res) {
     }
     const email = identity.email;
 
-    const product = body.product || {};
-    if (!product.decision || !product.metrics) {
-      return res.status(400).json({ error: "bad_request", message: "ไม่มีผลสแกน — กรอกข้อมูลให้ครบแล้วดูผลก่อน" });
+    const stage = body.stage === "script" ? "script" : "analyze";
+
+    // ─────────────────────────────────────────
+    // STAGE 2: เขียนสคริปต์จากมุมที่เลือก + เงื่อนไขถ่ายจริง
+    // ─────────────────────────────────────────
+    if (stage === "script") {
+      const angle = body.angle || {};
+      if (!angle.name || !angle.pain) {
+        return res.status(400).json({ error: "bad_request", message: "ไม่มีมุมขาย — กดวิเคราะห์ภาพก่อน แล้วเลือกมุม" });
+      }
+
+      const productName = String(body.product_name || "สินค้า").slice(0, 300);
+      const analysisBrief = String(body.analysis_brief || "").slice(0, 800);
+      const options = body.options || {};
+
+      const prompt = buildScriptPrompt({
+        productName,
+        analysisBrief,
+        angle: {
+          name: String(angle.name).slice(0, 200),
+          persona: String(angle.persona || "").slice(0, 300),
+          pain: String(angle.pain).slice(0, 300),
+          promise: String(angle.promise || "").slice(0, 300),
+          hook_example: String(angle.hook_example || "").slice(0, 300),
+        },
+        options,
+      });
+
+      const textOut = await callClaude([{ type: "text", text: prompt }], 3000);
+
+      let parsed;
+      try {
+        parsed = JSON.parse(cleanJsonText(textOut));
+      } catch (e) {
+        console.error("[sell-kit script] parse error:", textOut.slice(0, 500));
+        return res.status(502).json({ error: "parse_error", message: "AI ตอบไม่สมบูรณ์ — กดใหม่อีกครั้ง" });
+      }
+
+      if (!parsed?.script || !Array.isArray(parsed.script.sections) || !parsed.script.sections.length) {
+        return res.status(502).json({ error: "invalid_script", message: "สคริปต์ไม่ครบ — กดใหม่อีกครั้ง" });
+      }
+
+      console.log("[sell-kit] script ok:", { email, angle: angle.name, dur: parsed.script.duration_sec });
+      return res.status(200).json({ ok: true, script: parsed.script });
     }
 
-    const images = Array.isArray(body.images) ? body.images.slice(0, 2) : [];
+    // ─────────────────────────────────────────
+    // STAGE 1: ภาพ (+ ฟอร์มถ้ามี) → วิเคราะห์ + 5 มุมขาย
+    // ─────────────────────────────────────────
+    const images = (Array.isArray(body.images) ? body.images : []).slice(0, MAX_IMAGES);
+    const product = body.product || null;
+    const hasFormData = !!(product && product.metrics);
 
-    const brief = buildScanBrief(product);
+    if (!images.length && !hasFormData) {
+      return res.status(400).json({ error: "bad_request", message: "ใส่รูปสินค้า/กราฟอย่างน้อย 1 รูป หรือกรอกตัวเลขในฟอร์มก่อน" });
+    }
 
     const content = [];
     images.forEach((img) => {
@@ -194,71 +286,37 @@ export default async function handler(req, res) {
 
     let userNote = "";
     if (typeof body.audience === "string" && body.audience.trim()) {
-      userNote = `\n\nข้อมูลเพิ่มจากผู้ใช้ (กลุ่มเป้าหมาย/บริบทที่เขารู้): ${body.audience.trim().slice(0, 500)}`;
+      userNote = `\n\nข้อมูลเพิ่มจาก user: ${body.audience.trim().slice(0, 500)}`;
     }
 
+    const brief = buildScanBrief(product);
     content.push({
       type: "text",
-      text: `${SELL_KIT_PROMPT}\n\n════ ผลสแกนจริงจาก LEGO SCANNER ════\n${brief}${userNote}${images.length ? "\n\n(มีรูปสินค้าแนบมา " + images.length + " รูป — ใช้สิ่งที่เห็นจริงในรูปประกอบการวิเคราะห์และมุมขาย)" : "\n\n(ไม่มีรูปสินค้าแนบ — วิเคราะห์จากชื่อสินค้าและตัวเลขเท่านั้น ห้ามเดารายละเอียดที่มองไม่เห็น)"}`,
+      text: `${ANALYZE_PROMPT}\n${brief}${userNote}${images.length ? `\n\n(มีรูปแนบ ${images.length} รูป)` : "\n\n(ไม่มีรูปแนบ — วิเคราะห์จากตัวเลขฟอร์มเท่านั้น)"}`,
     });
 
-    console.log("[sell-kit] calling Claude", { email, model: ANTHROPIC_MODEL, images: images.length, decision: product.decision });
+    console.log("[sell-kit] analyze:", { email, model: ANTHROPIC_MODEL, images: images.length, hasFormData });
 
-    const aiRes = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: ANTHROPIC_MODEL,
-        // บทเรียนซ้ำจาก generate-angles: JSON ไทย long-form โดนตัดกลางถ้า token น้อย
-        max_tokens: 9000,
-        temperature: 0.7,
-        messages: [{ role: "user", content }],
-      }),
-    });
-
-    if (!aiRes.ok) {
-      const errTxt = await aiRes.text();
-      console.error("[sell-kit] Claude error:", aiRes.status, errTxt);
-      return res.status(502).json({
-        error: "ai_error",
-        message: `AI มีปัญหาชั่วคราว (${aiRes.status}) — ลองใหม่อีกครั้ง`,
-        detail: errTxt.slice(0, 500),
-      });
-    }
-
-    const aiData = await aiRes.json();
-    const textOut = (aiData.content || [])
-      .filter((b) => b.type === "text")
-      .map((b) => b.text)
-      .join("")
-      .trim();
+    const textOut = await callClaude(content, 4000);
 
     let kit;
     try {
       kit = JSON.parse(cleanJsonText(textOut));
     } catch (e) {
-      console.error("[sell-kit] parse error, raw:", textOut.slice(0, 800));
-      return res.status(502).json({
-        error: "parse_error",
-        message: "AI ตอบกลับมาไม่สมบูรณ์ — กดสร้างใหม่อีกครั้ง",
-      });
+      console.error("[sell-kit analyze] parse error:", textOut.slice(0, 500));
+      return res.status(502).json({ error: "parse_error", message: "AI ตอบไม่สมบูรณ์ — กดใหม่อีกครั้ง" });
     }
 
-    if (!kit || !kit.analysis || !Array.isArray(kit.angles) || !Array.isArray(kit.scripts)) {
-      return res.status(502).json({
-        error: "invalid_kit",
-        message: "ผลลัพธ์ไม่ครบ — กดสร้างใหม่อีกครั้ง",
-      });
+    if (!kit?.analysis || !Array.isArray(kit.angles) || !kit.angles.length) {
+      return res.status(502).json({ error: "invalid_kit", message: "ผลลัพธ์ไม่ครบ — กดใหม่อีกครั้ง" });
     }
 
-    // persist สรุป kit ลง tracker เหมือน generate-angles (best-effort — ไม่ block ผลลัพธ์)
+    // persist มุม+hook ลง tracker (best-effort)
     try {
-      const product_key = String(product.name || "").trim().toLowerCase();
-      if (product_key) {
+      const product_key = String(kit.product_name || product?.name || "").trim().toLowerCase();
+      // ห้าม persist ตอน AI ระบุสินค้าไม่ได้ (product_name จะเป็นประโยคอธิบายยาวๆ = ขยะใน tracker)
+      const looksLikeRefusal = product_key.length > 60 || /ไม่สามารถ|ไม่มีรูป|ระบุไม่ได้/.test(product_key);
+      if (product_key && !looksLikeRefusal) {
         await sbRest(`user_product_tracker?on_conflict=user_email,product_key`, {
           method: "POST",
           headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
@@ -276,13 +334,14 @@ export default async function handler(req, res) {
     }
 
     const response = { ok: true, kit };
-
-    if (DEBUG_SCANNER) {
-      response.debug = { model: ANTHROPIC_MODEL, raw: textOut.slice(0, 2000) };
-    }
+    if (DEBUG_SCANNER) response.debug = { model: ANTHROPIC_MODEL, raw: textOut.slice(0, 1500) };
 
     return res.status(200).json(response);
   } catch (err) {
+    if (err && err.status) {
+      console.error("[sell-kit] Claude error:", err.status, err.detail);
+      return res.status(502).json({ error: "ai_error", message: `AI มีปัญหาชั่วคราว (${err.status}) — ลองใหม่อีกครั้ง` });
+    }
     console.error("[sell-kit] server error:", err);
     return res.status(500).json({ error: "server_error", message: String(err) });
   }
